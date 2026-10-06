@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import {
   fetchMaidDashboard,
   createMaid,
@@ -17,6 +18,14 @@ import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import { Field, TextInput, TextArea, Select, Checkbox, FileInput } from '../../components/common/FormField';
 import { mediaUrl } from '../../utils/mediaUrl';
+
+// Must match what Backend1 accepts (utils/fileUpload/fileUpload.js and mutifileUpload.js);
+// anything else makes the API fail with a generic 500.
+const PROFILE_TYPES = ['jpg', 'jpeg', 'png', 'webp'];
+const DOCUMENT_TYPES = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+const toAccept = (types) => types.map((t) => `.${t}`).join(',');
+const invalidFiles = (files, types) =>
+  Array.from(files || []).filter((f) => !types.includes(f.name.split('.').pop().toLowerCase()));
 
 const emptyForm = {
   name: '',
@@ -117,6 +126,18 @@ export default function MaidFormPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const badProfile = invalidFiles(form.profileFile ? [form.profileFile] : [], PROFILE_TYPES);
+    if (badProfile.length) {
+      toast.error(`Profile photo must be ${PROFILE_TYPES.join(', ')} (got "${badProfile[0].name}")`);
+      return;
+    }
+    const badDocs = invalidFiles(form.wordFiles, DOCUMENT_TYPES);
+    if (badDocs.length) {
+      toast.error(`Documents must be ${DOCUMENT_TYPES.join(', ')} — not allowed: ${badDocs.map((f) => f.name).join(', ')}`);
+      return;
+    }
+
     setSubmitting(true);
 
     const fields = {
@@ -439,10 +460,14 @@ export default function MaidFormPage() {
           <h3 className="mb-4 text-sm font-semibold text-gray-700">Files</h3>
           <div className="space-y-4">
             <Field label="Profile Photo">
-              <FileInput accept="image/*" onChange={(e) => setForm({ ...form, profileFile: e.target.files[0] })} />
+              <FileInput accept={toAccept(PROFILE_TYPES)} onChange={(e) => setForm({ ...form, profileFile: e.target.files[0] })} />
             </Field>
-            <Field label="Supporting Documents" hint="You can select multiple files">
-              <FileInput multiple onChange={(e) => setForm({ ...form, wordFiles: e.target.files })} />
+            <Field label="Supporting Documents" hint="PDF or images (JPG, PNG, WEBP). You can select multiple files">
+              <FileInput
+                multiple
+                accept={toAccept(DOCUMENT_TYPES)}
+                onChange={(e) => setForm({ ...form, wordFiles: e.target.files })}
+              />
             </Field>
           </div>
         </section>
