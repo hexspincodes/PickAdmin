@@ -1,5 +1,8 @@
 import { api1, unwrap } from '../../api/axiosClient';
 
+// Backend1 returns a fixed 100 customers per page (it ignores any `limit` param)
+export const CUSTOMERS_PAGE_SIZE = 100;
+
 // GET /api/v1/admin/customer — Backend1, JWT, SA only, paginated
 export const getCustomers = (page = 1, search = '') =>
   unwrap(api1.get('/api/v1/admin/customer', { params: { page, search } }));

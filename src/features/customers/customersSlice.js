@@ -7,7 +7,11 @@ export const fetchCustomers = createAsyncThunk(
   async ({ page = 1, search = '' } = {}, { rejectWithValue }) => {
     try {
       const res = await customersAPI.getCustomers(page, search);
-      return { list: res.data?.customer || [], count: res.data?.count || 0, page, search };
+      // Backend1 nests the page under `customer`: { customer: { data: [...], count } }
+      const payload = res.data?.customer;
+      const list = Array.isArray(payload) ? payload : payload?.data || [];
+      const count = (Array.isArray(payload) ? res.data?.count : payload?.count) || 0;
+      return { list, count, page, search };
     } catch (err) {
       return rejectWithValue(err.message);
     }
@@ -59,7 +63,7 @@ export const verifyCustomerPayment = createAsyncThunk(
 
 const customersSlice = createSlice({
   name: 'customers',
-  initialState: { items: [], status: 'idle', error: null, page: 1, search: '' },
+  initialState: { items: [], count: 0, status: 'idle', error: null, page: 1, search: '' },
   reducers: {},
   extraReducers: (builder) => {
     builder
@@ -69,6 +73,7 @@ const customersSlice = createSlice({
       .addCase(fetchCustomers.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.items = action.payload.list;
+        state.count = action.payload.count;
         state.page = action.payload.page;
         state.search = action.payload.search;
       })

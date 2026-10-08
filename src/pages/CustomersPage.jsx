@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { KeyRound, Ban, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { fetchCustomers, resetCustomerPassword, toggleCustomerBlock, verifyCustomerPayment } from '../features/customers/customersSlice';
+import { CUSTOMERS_PAGE_SIZE } from '../features/customers/customersAPI';
 import PageHeader from '../components/common/PageHeader';
 import Table from '../components/common/Table';
 import Button from '../components/common/Button';
@@ -12,7 +13,8 @@ import { Field, TextInput } from '../components/common/FormField';
 
 export default function CustomersPage() {
   const dispatch = useDispatch();
-  const { items, status, page, search } = useSelector((state) => state.customers);
+  const { items, count, status, error, page, search } = useSelector((state) => state.customers);
+  const totalPages = Math.max(1, Math.ceil(count / CUSTOMERS_PAGE_SIZE));
   const [searchInput, setSearchInput] = useState(search);
   const [resetTarget, setResetTarget] = useState(null);
   const [generatedPassword, setGeneratedPassword] = useState('');
@@ -86,8 +88,31 @@ export default function CustomersPage() {
         actions={<SearchInput value={searchInput} onChange={setSearchInput} placeholder="Search by name or email" className="w-72" />}
       />
 
+      {status === 'failed' && <p className="mb-3 text-sm text-red-500">Couldn't load customers: {error}</p>}
       <Table columns={columns} rows={items} loading={status === 'loading'} rowKey="user_id" />
-      <p className="mt-2 text-xs text-gray-400">Page {page}</p>
+      <div className="mt-3 flex items-center justify-between">
+        <p className="text-xs text-gray-400">
+          Page {page} of {totalPages} · {count} customers
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={page <= 1 || status === 'loading'}
+            onClick={() => dispatch(fetchCustomers({ page: page - 1, search }))}
+          >
+            Prev
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={page >= totalPages || status === 'loading'}
+            onClick={() => dispatch(fetchCustomers({ page: page + 1, search }))}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
 
       <Modal
         open={!!resetTarget}
