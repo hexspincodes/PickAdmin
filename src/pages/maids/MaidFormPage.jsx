@@ -19,6 +19,7 @@ import { TextInput, Select, Checkbox, FileInput } from '../../components/common/
 import CountrySelect from '../../components/common/CountrySelect';
 import RichTextEditor from '../../components/common/RichTextEditor';
 import { mediaUrl } from '../../utils/mediaUrl';
+import { getActiveSkills } from '../../features/skills/skillsAPI';
 import { joinPhone, splitPhone } from '../../constants/countries';
 import {
   DAYS_OFF,
@@ -227,6 +228,21 @@ export default function MaidFormPage() {
   const [tab, setTab] = useState(0);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  // Active skills from the Skills page; the built-in list covers a failed request.
+  const [skillOptions, setSkillOptions] = useState(SKILLS);
+
+  useEffect(() => {
+    let cancelled = false;
+    getActiveSkills()
+      .then((res) => {
+        const names = (res.data?.skills || []).map((s) => s.name);
+        if (!cancelled && names.length) setSkillOptions(names);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (isEdit) dispatch(fetchMaidDashboard(id));
@@ -353,7 +369,7 @@ export default function MaidFormPage() {
   }
 
   const profileSrc = profilePreview || (isEdit && current?.profile ? mediaUrl(current.profile) : null);
-  const extraSkills = form.skills.filter((s) => !SKILLS.includes(s));
+  const extraSkills = form.skills.filter((s) => !skillOptions.includes(s));
 
   return (
     <div className="w-full">
@@ -592,7 +608,7 @@ export default function MaidFormPage() {
             <section className={sectionCls}>
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Skills</h3>
               <div className="flex flex-wrap gap-2">
-                {[...SKILLS, ...extraSkills].map((skill) => {
+                {[...skillOptions, ...extraSkills].map((skill) => {
                   const on = form.skills.includes(skill);
                   return (
                     <button

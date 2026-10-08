@@ -10,6 +10,7 @@ import MaidFormPage from './pages/maids/MaidFormPage';
 import JobsPage from './pages/JobsPage';
 import BlogPage from './pages/BlogPage';
 import ContactPage from './pages/ContactPage';
+import SkillsPage from './pages/SkillsPage';
 import CustomersPage from './pages/CustomersPage';
 import PaymentsPage from './pages/PaymentsPage';
 import TeamPage from './pages/TeamPage';
@@ -75,6 +76,15 @@ export default function App() {
               element={
                 <RoleGuard allowed={[ROLES.SA, ROLES.A]}>
                   <ContactPage />
+                </RoleGuard>
+              }
+            />
+
+            <Route
+              path="skills"
+              element={
+                <RoleGuard allowed={[ROLES.SA, ROLES.A]}>
+                  <SkillsPage />
                 </RoleGuard>
               }
             />
