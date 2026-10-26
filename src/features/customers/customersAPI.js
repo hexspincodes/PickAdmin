@@ -13,7 +13,3 @@ export const updateCustomerPassword = (user_id, password) =>
 
 // GET /api/v1/admin/block-user/:user_id — Backend1, JWT, SA only (state-changing GET, by design)
 export const toggleUserBlock = (user_id) => unwrap(api1.get(`/api/v1/admin/block-user/${user_id}`));
-
-// POST /api/v1/admin/verify-payment — Backend1, JWT, SA only (proxies to Backend2)
-export const verifyCustomerPayment = (user_id, transRef) =>
-  unwrap(api1.post('/api/v1/admin/verify-payment', { user_id, transRef }));

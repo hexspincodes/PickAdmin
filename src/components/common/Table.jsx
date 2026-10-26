@@ -1,9 +1,11 @@
-import { Loader2, InboxIcon } from 'lucide-react';
+import { InboxIcon } from 'lucide-react';
+import Loader from './Loader';
 
 /**
  * columns: [{ key, header, render?(row) }]
+ * onRowClick?(row): makes rows clickable; buttons inside cells should stopPropagation.
  */
-export default function Table({ columns, rows, loading, emptyMessage = 'No records found', rowKey = '_id' }) {
+export default function Table({ columns, rows, loading, emptyMessage = 'No records found', rowKey = '_id', onRowClick }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
       <table className="min-w-full border-collapse">
@@ -22,9 +24,8 @@ export default function Table({ columns, rows, loading, emptyMessage = 'No recor
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={columns.length} className="border border-gray-200 px-4 py-10 text-center text-sm text-gray-400">
-                <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                Loading…
+              <td colSpan={columns.length} className="border border-gray-200 px-4">
+                <Loader />
               </td>
             </tr>
           ) : rows.length === 0 ? (
@@ -36,7 +37,11 @@ export default function Table({ columns, rows, loading, emptyMessage = 'No recor
             </tr>
           ) : (
             rows.map((row, i) => (
-              <tr key={row[rowKey] ?? i} className="hover:bg-gray-50">
+              <tr
+                key={row[rowKey] ?? i}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={`transition-colors hover:bg-brand-50 ${onRowClick ? 'cursor-pointer' : ''}`}
+              >
                 {columns.map((col) => (
                   <td key={col.key} className="whitespace-nowrap border border-gray-200 px-4 py-3 text-sm text-gray-700">
                     {col.render ? col.render(row) : row[col.key]}

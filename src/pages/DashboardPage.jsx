@@ -11,13 +11,15 @@ import DonutStatCard from '../components/dashboard/DonutStatCard';
 import AnalyticsHistoryCard from '../components/dashboard/AnalyticsHistoryCard';
 import ProjectHistoryCard from '../components/dashboard/ProjectHistoryCard';
 import AssignmentsCard from '../components/dashboard/AssignmentsCard';
+import Loader from '../components/common/Loader';
 import { formatDate } from '../utils/formatDate';
 
 export default function DashboardPage() {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const { counts } = useSelector((state) => state.maids);
-  const analytics = useSelector((state) => state.analytics.items);
+  const { counts, countsStatus } = useSelector((state) => state.maids);
+  const { items: analytics, status: analyticsStatus } = useSelector((state) => state.analytics);
+  const countsLoading = !counts && countsStatus !== 'failed';
 
   useEffect(() => {
     dispatch(fetchMaidCounts());
@@ -77,33 +79,39 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <TimelineProgressCard
-          title="Verification Progress"
-          percent={verifiedPercent}
-          startDate={formatDate(start)}
-          endDate={formatDate(end)}
-          todayDate={formatDate(today)}
-        />
-        <ActiveStatCard
-          title="New Applications"
-          badge={`${total}`}
-          value={total}
-          caption="applications total"
-          data={[4, 7, 5, 9, 6, 12, 8]}
-        />
-        <DonutStatCard
-          title="Featured Maids"
-          badge={`${featuredPercent}%`}
-          value={featured}
-          caption="of total applications"
-          percent={featuredPercent}
-        />
-      </div>
+      {countsLoading ? (
+        <div className="rounded-3xl border border-gray-100 bg-white shadow-sm">
+          <Loader label="Loading stats…" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <TimelineProgressCard
+            title="Verification Progress"
+            percent={verifiedPercent}
+            startDate={formatDate(start)}
+            endDate={formatDate(end)}
+            todayDate={formatDate(today)}
+          />
+          <ActiveStatCard
+            title="New Applications"
+            badge={`${total}`}
+            value={total}
+            caption="applications total"
+            data={[4, 7, 5, 9, 6, 12, 8]}
+          />
+          <DonutStatCard
+            title="Featured Maids"
+            badge={`${featuredPercent}%`}
+            value={featured}
+            caption="of total applications"
+            percent={featuredPercent}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <AnalyticsHistoryCard data={analytics} />
+          <AnalyticsHistoryCard data={analytics} loading={analyticsStatus === 'loading'} />
         </div>
         <div className="lg:col-span-2">
           <ProjectHistoryCard />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus, Pencil, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, TicketPercent, CheckCircle2, CalendarX2 } from 'lucide-react';
 import { fetchCoupons, createCoupon, updateCoupon, removeCoupon } from '../features/coupons/couponsSlice';
 import PageHeader from '../components/common/PageHeader';
 import Table from '../components/common/Table';
@@ -9,6 +9,7 @@ import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import SearchInput from '../components/common/SearchInput';
+import StatCards from '../components/common/StatCards';
 import { Field, TextInput, Checkbox } from '../components/common/FormField';
 import { formatDateTime, toDateTimeLocal } from '../utils/formatDate';
 
@@ -22,15 +23,24 @@ const emptyForm = {
 };
 
 const couponState = (coupon) => {
-  if (!coupon.is_active) return { tone: 'gray', label: 'Inactive' };
-  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) return { tone: 'yellow', label: 'Expired' };
-  return { tone: 'green', label: 'Active' };
+  if (!coupon.is_active) return { key: 'inactive', tone: 'gray', label: 'Inactive' };
+  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) return { key: 'expired', tone: 'yellow', label: 'Expired' };
+  return { key: 'active', tone: 'green', label: 'Active' };
 };
+
+// filter: the status a card shows in the table ('' = all). Keys match couponState().key.
+const STAT_CARDS = [
+  { key: 'total', label: 'All coupons', filter: '', icon: TicketPercent },
+  { key: 'active', label: 'Active', filter: 'active', icon: CheckCircle2 },
+  { key: 'inactive', label: 'Inactive', filter: 'inactive', icon: EyeOff },
+  { key: 'expired', label: 'Expired', filter: 'expired', icon: CalendarX2 },
+];
 
 export default function CouponsPage() {
   const dispatch = useDispatch();
   const { items, status } = useSelector((state) => state.coupons);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   // null = closed, {} = creating, a coupon row = editing that coupon
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -42,10 +52,21 @@ export default function CouponsPage() {
     dispatch(fetchCoupons());
   }, [dispatch]);
 
+  const counts = useMemo(() => {
+    if ((status === 'idle' || status === 'loading') && items.length === 0) return null;
+    const tally = { total: items.length, active: 0, inactive: 0, expired: 0 };
+    items.forEach((c) => {
+      tally[couponState(c).key] += 1;
+    });
+    return tally;
+  }, [items, status]);
+
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return term ? items.filter((c) => c.code.toLowerCase().includes(term)) : items;
-  }, [items, search]);
+    return items.filter(
+      (c) => (!term || c.code.toLowerCase().includes(term)) && (!statusFilter || couponState(c).key === statusFilter),
+    );
+  }, [items, search, statusFilter]);
 
   const isEdit = !!editing?._id;
 
@@ -145,10 +166,25 @@ export default function CouponsPage() {
         title="Coupons"
         description="Percentage discounts customers can apply to any package at checkout"
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> New Coupon
-          </Button>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-full bg-gray-900 py-1.5 pl-1.5 pr-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500">
+              <Plus className="h-4 w-4" />
+            </span>
+            Create New Coupon
+          </button>
         }
+      />
+
+      <StatCards
+        cards={STAT_CARDS}
+        counts={counts}
+        activeFilter={statusFilter}
+        onSelect={setStatusFilter}
+        className="xl:grid-cols-4"
       />
 
       <SearchInput value={search} onChange={setSearch} placeholder="Search codes…" className="mb-4 max-w-sm" />
@@ -158,7 +194,7 @@ export default function CouponsPage() {
         rows={rows}
         loading={status === 'loading' && items.length === 0}
         rowKey="_id"
-        emptyMessage={search ? 'No coupons match your search' : 'No coupons yet'}
+        emptyMessage={search || statusFilter ? 'No coupons match these filters' : 'No coupons yet'}
       />
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title={isEdit ? 'Edit Coupon' : 'New Coupon'} size="sm">

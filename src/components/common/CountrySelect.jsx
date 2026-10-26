@@ -110,7 +110,7 @@ export default function CountrySelect({ mode, value, onChange, id, placeholder =
   }`;
 
   return (
-    <div ref={rootRef} className={`relative ${mode === 'dial' ? 'shrink-0' : ''}`}>
+    <div ref={rootRef} className={`relative ${mode === 'dial' ? 'flex h-full shrink-0' : ''}`}>
       <button
         ref={triggerRef}
         id={id}

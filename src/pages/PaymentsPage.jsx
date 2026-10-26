@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { BadgeCheck, Calendar, Filter, Pencil, RotateCcw } from 'lucide-react';
-import { fetchPayments, manualVerifyPayment, updatePayment } from '../features/payments/paymentsSlice';
+import { fetchPayments, fetchAllPayments, manualVerifyPayment } from '../features/payments/paymentsSlice';
+import { STATUS_TONE, PLAN_LABEL, statusLabel, amountAED } from '../features/payments/paymentUtils';
+import PaymentPeriodCards, { isPaidPayment, paidAt, periodRange, inRange } from '../components/payments/PaymentPeriodCards';
+import EditPaymentForm from '../components/payments/EditPaymentForm';
 import PageHeader from '../components/common/PageHeader';
 import Table from '../components/common/Table';
 import Button from '../components/common/Button';
@@ -9,58 +12,21 @@ import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
 import SearchInput from '../components/common/SearchInput';
 import Pagination from '../components/common/Pagination';
-import { Field, TextInput, Select } from '../components/common/FormField';
-import { formatDate, formatDateTime, toDateTimeLocal } from '../utils/formatDate';
+import { formatDate, formatDateTime } from '../utils/formatDate';
 
-const STATUS_TONE = { 1: 'green', 2: 'yellow', 0: 'gray' };
-const STATUS_LABEL = { 1: 'Paid', 2: 'Suspended', 0: 'Pending' };
-const PLAN_LABEL = { 0: 'Basic', 1: 'Standard', 2: 'Premium', 3: 'Starter' };
-// What records created before the charged amount was stored were billed, in AED
-// (Starter was 195 then; new Starter payments store their 0.38 amount).
-const PLAN_PRICE = { 0: 350, 1: 495, 2: 899, 3: 195 };
 const LIMIT = 100;
-
-// Status 2 is set both by the expiry job and by admins suspending a customer.
-const statusLabel = (row) => {
-  if (row.status === 2 && row.expiryDate && new Date(row.expiryDate) < new Date()) return 'Expired';
-  return STATUS_LABEL[row.status] ?? row.status;
-};
-
-const amountAED = (row) => (row.amount != null ? row.amount / 100 : PLAN_PRICE[row.type]);
 
 export default function PaymentsPage() {
   const dispatch = useDispatch();
-  const { items, count, status, page, search } = useSelector((state) => state.payments);
+  const { items, count, status, page, search, all, allStatus } = useSelector((state) => state.payments);
   const [searchInput, setSearchInput] = useState(search);
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [period, setPeriod] = useState(null);
+  const [customDay, setCustomDay] = useState('');
   const [editing, setEditing] = useState(null);
-  const [editForm, setEditForm] = useState({ expiryDate: '', status: '1' });
-  const [saving, setSaving] = useState(false);
-
-  const openEdit = (row) => {
-    setEditForm({ expiryDate: toDateTimeLocal(row.expiryDate), status: String(row.status) });
-    setEditing(row);
-  };
-
-  const editWouldBeExpired =
-    editForm.status === '1' && editForm.expiryDate && new Date(editForm.expiryDate) <= new Date();
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    const result = await dispatch(
-      updatePayment({
-        id: editing._id,
-        // datetime-local is local time; send an absolute instant.
-        expiryDate: new Date(editForm.expiryDate).toISOString(),
-        status: Number(editForm.status),
-      }),
-    );
-    setSaving(false);
-    if (!result.error) setEditing(null);
-  };
+  const openEdit = setEditing;
 
   useEffect(() => {
     dispatch(fetchPayments({ page: 1, limit: LIMIT, search: '' }));
@@ -74,8 +40,27 @@ export default function PaymentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
+  useEffect(() => {
+    dispatch(fetchAllPayments());
+  }, [dispatch]);
+
+  const paid = useMemo(() => all.filter(isPaidPayment), [all]);
+
+  // With a period card selected the table lists that period's paid payments from the full set
+  // (not just the loaded page), searched client-side; otherwise it's the server page as before.
+  const sourceRows = useMemo(() => {
+    if (!period) return items;
+    const range = periodRange(period, customDay);
+    const term = search.trim().toLowerCase();
+    return paid.filter(
+      (row) =>
+        inRange(paidAt(row), range) &&
+        (!term || [row.name, row.email, row.mobile, row.transRef, row.user_id].some((v) => v != null && String(v).toLowerCase().includes(term))),
+    );
+  }, [period, customDay, paid, items, search]);
+
   const filteredRows = useMemo(() => {
-    return items
+    return sourceRows
       .filter((row) => {
         if (statusFilter !== 'all' && String(row.status) !== statusFilter) return false;
         if (dateFrom && (!row.createdAt || new Date(row.createdAt) < new Date(dateFrom))) return false;
@@ -83,17 +68,31 @@ export default function PaymentsPage() {
         return true;
       })
       .sort((a, b) => (b.status === 1 ? 1 : 0) - (a.status === 1 ? 1 : 0));
-  }, [items, statusFilter, dateFrom, dateTo]);
+  }, [sourceRows, statusFilter, dateFrom, dateTo]);
 
-  const hasActiveFilters = statusFilter !== 'all' || dateFrom || dateTo;
+  const hasActiveFilters = statusFilter !== 'all' || dateFrom || dateTo || period;
   const clearFilters = () => {
     setStatusFilter('all');
     setDateFrom('');
     setDateTo('');
+    setPeriod(null);
   };
 
   const columns = [
-    { key: 'user_id', header: 'User ID' },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (row) => (
+        <div className="leading-tight" title={`User ID: ${row.user_id}`}>
+          <p className="font-medium capitalize text-gray-900">{row.name || '—'}</p>
+          {row.email && (
+            <a href={`mailto:${row.email}`} className="text-xs text-gray-500 hover:text-brand-600 hover:underline">
+              {row.email}
+            </a>
+          )}
+        </div>
+      ),
+    },
     {
       key: 'createdAt',
       header: (
@@ -161,10 +160,20 @@ export default function PaymentsPage() {
     <div>
       <PageHeader title="Payments" description="All customer payment and subscription records" />
 
+      <PaymentPeriodCards
+        paid={paid}
+        amountOf={amountAED}
+        loading={allStatus !== 'succeeded' && all.length === 0}
+        activePeriod={period}
+        onSelect={setPeriod}
+        customDay={customDay}
+        onCustomDayChange={setCustomDay}
+      />
+
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <div className="min-w-[220px] flex-1">
           <label className="mb-1 block text-[11px] font-medium text-gray-400">Search</label>
-          <SearchInput value={searchInput} onChange={setSearchInput} placeholder="Search by user ID" />
+          <SearchInput value={searchInput} onChange={setSearchInput} placeholder="Search name, email, phone or ref" />
         </div>
 
         <div>
@@ -211,59 +220,27 @@ export default function PaymentsPage() {
         )}
 
         <span className="ml-auto whitespace-nowrap pb-2 text-xs text-gray-400">
-          {filteredRows.length} of {items.length} shown
+          {filteredRows.length} of {sourceRows.length} shown
         </span>
       </div>
 
-      <Table columns={columns} rows={filteredRows} loading={status === 'loading'} rowKey="_id" />
-      <Pagination
-        page={page}
-        totalPages={Math.ceil(count / LIMIT) || 1}
-        onChange={(p) => dispatch(fetchPayments({ page: p, limit: LIMIT, search }))}
+      <Table
+        columns={columns}
+        rows={filteredRows}
+        loading={period ? allStatus === 'loading' && all.length === 0 : status === 'loading'}
+        rowKey="_id"
+        emptyMessage={period ? 'No payments in this period' : undefined}
       />
+      {!period && (
+        <Pagination
+          page={page}
+          totalPages={Math.ceil(count / LIMIT) || 1}
+          onChange={(p) => dispatch(fetchPayments({ page: p, limit: LIMIT, search }))}
+        />
+      )}
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title="Edit Payment" size="sm">
-        {editing && (
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
-              <div>
-                <span className="font-medium text-gray-700">{editing.name || editing.user_id}</span>
-                {editing.email && <> · {editing.email}</>}
-              </div>
-              <div>
-                {PLAN_LABEL[editing.type] ?? editing.type} · Paid {formatDateTime(editing.paymentDate)} · Ref{' '}
-                {editing.transRef}
-              </div>
-            </div>
-            <Field label="Expires at" required hint="Shown in your local time.">
-              <TextInput
-                required
-                type="datetime-local"
-                value={editForm.expiryDate}
-                onChange={(e) => setEditForm({ ...editForm, expiryDate: e.target.value })}
-              />
-            </Field>
-            <Field
-              label="Status"
-              required
-              hint={editWouldBeExpired ? 'An active subscription needs an expiry date in the future.' : undefined}
-            >
-              <Select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
-                <option value="1">Paid (active)</option>
-                <option value="2">Expired / suspended</option>
-                <option value="0">Pending</option>
-              </Select>
-            </Field>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" loading={saving} disabled={!!editWouldBeExpired}>
-                Save
-              </Button>
-            </div>
-          </form>
-        )}
+        {editing && <EditPaymentForm key={editing._id} payment={editing} onDone={() => setEditing(null)} />}
       </Modal>
     </div>
   );

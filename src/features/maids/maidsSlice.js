@@ -2,10 +2,19 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import toast from 'react-hot-toast';
 import * as maidsAPI from './maidsAPI';
 
+const CLIENT_STATUS_FILTERS = { pending: 0, disabled: 3 };
+
 export const fetchMaids = createAsyncThunk(
   'maids/fetch',
   async ({ page = 1, limit = 100, search = '', filter = '' } = {}, { rejectWithValue }) => {
     try {
+      // No backend filter for pending/disabled: fetch 'unapproved' (only status 0 and 3), filter and page here.
+      if (filter in CLIENT_STATUS_FILTERS) {
+        const res = await maidsAPI.getAllMaids(1, 10000, search, 'unapproved');
+        const matching = (res.data?.jobApplication || []).filter((m) => m.status === CLIENT_STATUS_FILTERS[filter]);
+        const list = matching.slice((page - 1) * limit, page * limit);
+        return { list, count: matching.length, page, limit, search, filter };
+      }
       const res = await maidsAPI.getAllMaids(page, limit, search, filter);
       return { list: res.data?.jobApplication || [], count: res.data?.count || 0, page, limit, search, filter };
     } catch (err) {
@@ -13,6 +22,32 @@ export const fetchMaids = createAsyncThunk(
     }
   },
 );
+
+// The counts endpoint has no status breakdown, so derive it from the list endpoint's `count`.
+// There is no 'disabled' filter: 'unapproved' holds only pending (0) and disabled (3) maids, so split that list.
+export const fetchMaidStatusCounts = createAsyncThunk('maids/fetchStatusCounts', async (_, { rejectWithValue }) => {
+  try {
+    const [all, approved, hired, unapproved] = await Promise.all([
+      maidsAPI.getAllMaids(1, 1, '', ''),
+      maidsAPI.getAllMaids(1, 1, '', 'approved'),
+      maidsAPI.getAllMaids(1, 1, '', 'hired'),
+      maidsAPI.getAllMaids(1, 10000, '', 'unapproved'),
+    ]);
+    const total = all.data?.count || 0;
+    const hiredCount = hired.data?.count || 0;
+    const disabled = (unapproved.data?.jobApplication || []).filter((m) => m.status === 3).length;
+    return {
+      total,
+      approved: approved.data?.count || 0,
+      pending: (unapproved.data?.count || 0) - disabled,
+      disabled,
+      hired: hiredCount,
+      available: total - hiredCount,
+    };
+  } catch (err) {
+    return rejectWithValue(err.message);
+  }
+});
 
 export const fetchPendingMaids = createAsyncThunk('maids/fetchPending', async (_, { rejectWithValue }) => {
   try {
@@ -78,8 +113,7 @@ export const deleteMaid = createAsyncThunk('maids/delete', async (id, { dispatch
   try {
     await maidsAPI.deleteMaid(id);
     toast.success('Maid application deleted');
-    const { page, limit, search, filter } = getState().maids;
-    dispatch(fetchMaids({ page, limit, search, filter }));
+    refetchAfterAction(dispatch, getState);
   } catch (err) {
     toast.error(err.message);
     return rejectWithValue(err.message);
@@ -89,6 +123,7 @@ export const deleteMaid = createAsyncThunk('maids/delete', async (id, { dispatch
 function refetchAfterAction(dispatch, getState) {
   const { page, limit, search, filter } = getState().maids;
   dispatch(fetchMaids({ page, limit, search, filter }));
+  dispatch(fetchMaidStatusCounts());
 }
 
 export const setMaidVerified = createAsyncThunk(
@@ -160,14 +195,21 @@ const maidsSlice = createSlice({
     filter: '',
     pending: [],
     counts: null,
+    countsStatus: 'idle',
+    statusCounts: null,
     current: null,
     currentStatus: 'idle',
     history: [],
+    historyStatus: 'idle',
   },
   reducers: {
     clearCurrentMaid: (state) => {
       state.current = null;
       state.history = [];
+    },
+    clearMaidHistory: (state) => {
+      state.history = [];
+      state.historyStatus = 'idle';
     },
   },
   extraReducers: (builder) => {
@@ -191,8 +233,18 @@ const maidsSlice = createSlice({
       .addCase(fetchPendingMaids.fulfilled, (state, action) => {
         state.pending = action.payload;
       })
+      .addCase(fetchMaidCounts.pending, (state) => {
+        state.countsStatus = 'loading';
+      })
       .addCase(fetchMaidCounts.fulfilled, (state, action) => {
+        state.countsStatus = 'succeeded';
         state.counts = action.payload;
+      })
+      .addCase(fetchMaidCounts.rejected, (state) => {
+        state.countsStatus = 'failed';
+      })
+      .addCase(fetchMaidStatusCounts.fulfilled, (state, action) => {
+        state.statusCounts = action.payload;
       })
       .addCase(fetchMaidDashboard.pending, (state) => {
         state.currentStatus = 'loading';
@@ -205,11 +257,18 @@ const maidsSlice = createSlice({
         state.currentStatus = 'failed';
         state.error = action.payload;
       })
+      .addCase(fetchMaidHistory.pending, (state) => {
+        state.historyStatus = 'loading';
+      })
       .addCase(fetchMaidHistory.fulfilled, (state, action) => {
+        state.historyStatus = 'succeeded';
         state.history = action.payload;
+      })
+      .addCase(fetchMaidHistory.rejected, (state) => {
+        state.historyStatus = 'failed';
       });
   },
 });
 
-export const { clearCurrentMaid } = maidsSlice.actions;
+export const { clearCurrentMaid, clearMaidHistory } = maidsSlice.actions;
 export default maidsSlice.reducer;

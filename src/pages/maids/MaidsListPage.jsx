@@ -1,22 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Trash2, CheckCircle2, EyeOff, Eye, History, Video } from 'lucide-react';
-import { fetchMaids, deleteMaid, setMaidVerified, setMaidDisabled } from '../../features/maids/maidsSlice';
+import { Link, useNavigate } from 'react-router-dom';
+import clsx from 'clsx';
+import { Plus, Video, SlidersHorizontal, X } from 'lucide-react';
+import { fetchMaids, fetchMaidStatusCounts, deleteMaid } from '../../features/maids/maidsSlice';
 import PageHeader from '../../components/common/PageHeader';
 import Table from '../../components/common/Table';
-import Button from '../../components/common/Button';
+import IconActionButton from '../../components/common/IconActionButton';
 import Badge from '../../components/common/Badge';
 import SearchInput from '../../components/common/SearchInput';
 import Pagination from '../../components/common/Pagination';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import { Select } from '../../components/common/FormField';
-import MaidHistoryModal from './MaidHistoryModal';
+import MaidStatusCards from './MaidStatusCards';
 
 const FILTERS = [
   { value: '', label: 'All' },
   { value: 'approved', label: 'Approved' },
-  { value: 'unapproved', label: 'Unapproved' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'disabled', label: 'Disabled' },
   { value: 'hired', label: 'Hired' },
   { value: 'unhired', label: 'Available' },
 ];
@@ -24,13 +25,13 @@ const FILTERS = [
 export default function MaidsListPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { items, count, status, page, limit, search, filter } = useSelector((state) => state.maids);
+  const { items, count, status, page, limit, search, filter, statusCounts } = useSelector((state) => state.maids);
   const [searchInput, setSearchInput] = useState(search);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [historyTarget, setHistoryTarget] = useState(null);
 
   useEffect(() => {
     dispatch(fetchMaids({ page: 1, limit: 100, search: '', filter: '' }));
+    dispatch(fetchMaidStatusCounts());
   }, [dispatch]);
 
   useEffect(() => {
@@ -43,6 +44,11 @@ export default function MaidsListPage() {
 
   const handleFilterChange = (value) => {
     dispatch(fetchMaids({ page: 1, limit, search, filter: value }));
+  };
+
+  const clearFilters = () => {
+    setSearchInput('');
+    dispatch(fetchMaids({ page: 1, limit, search: '', filter: '' }));
   };
 
   const handleDelete = async () => {
@@ -95,32 +101,9 @@ export default function MaidsListPage() {
       key: 'actions',
       header: '',
       render: (row) => (
-        <div className="flex justify-end gap-1.5">
-          <Button variant="secondary" size="sm" title="History" onClick={() => setHistoryTarget(row)}>
-            <History className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            title={row.status === 1 ? 'Un-verify' : 'Verify'}
-            onClick={() => dispatch(setMaidVerified({ id: row._id, verified: row.status !== 1 }))}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            title={row.status === 3 ? 'Enable' : 'Disable'}
-            onClick={() => dispatch(setMaidDisabled({ id: row._id, disabled: row.status !== 3 }))}
-          >
-            {row.status === 3 ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-          </Button>
-          <Button variant="secondary" size="sm" title="Edit" onClick={() => navigate(`/maids/${row._id}/edit`)}>
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="danger" size="sm" title="Delete" onClick={() => setDeleteTarget(row)}>
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+        <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+          <IconActionButton action="edit" label={`Edit ${row.name}`} onClick={() => navigate(`/maids/${row._id}/edit`)} />
+          <IconActionButton action="delete" label={`Delete ${row.name}`} onClick={() => setDeleteTarget(row)} />
         </div>
       ),
     },
@@ -132,23 +115,68 @@ export default function MaidsListPage() {
         title="Maids"
         description="Maid applications and profiles"
         actions={
-          <>
-            <SearchInput value={searchInput} onChange={setSearchInput} placeholder="Search name, email, ref, mobile" className="w-64" />
-            <Select value={filter} onChange={(e) => handleFilterChange(e.target.value)} className="w-40">
-              {FILTERS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </Select>
-            <Button onClick={() => navigate('/maids/new')}>
-              <Plus className="h-4 w-4" /> Add Maid
-            </Button>
-          </>
+          <Link
+            to="/maids/new"
+            className="inline-flex items-center gap-2 rounded-full bg-gray-900 py-1.5 pl-1.5 pr-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500">
+              <Plus className="h-4 w-4" />
+            </span>
+            Create Maid
+          </Link>
         }
       />
 
-      <Table columns={columns} rows={items} loading={status === 'loading'} rowKey="_id" />
+      <MaidStatusCards counts={statusCounts} activeFilter={filter} onSelect={handleFilterChange} />
+
+      <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-3 shadow-sm lg:flex-row lg:items-center">
+        <SearchInput
+          value={searchInput}
+          onChange={setSearchInput}
+          placeholder="Search name, email, ref, mobile"
+          className="lg:w-80"
+          inputClassName="rounded-full border-gray-200 bg-gray-50 focus:bg-white"
+        />
+        <div className="flex flex-1 items-center gap-1.5 overflow-x-auto">
+          <SlidersHorizontal className="mr-1 h-4 w-4 shrink-0 text-gray-400" />
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => handleFilterChange(f.value)}
+              className={clsx(
+                'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                filter === f.value ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-200">
+            <span className="text-sm font-bold text-brand-600">{count}</span>
+            result{count === 1 ? '' : 's'}
+          </span>
+          {(filter || search) && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50"
+            >
+              <X className="h-3.5 w-3.5" /> Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      <Table
+        columns={columns}
+        rows={items}
+        loading={status === 'loading'}
+        rowKey="_id"
+        onRowClick={(row) => navigate(`/maids/${row._id}`)}
+      />
       <Pagination page={page} totalPages={Math.ceil(count / limit) || 1} onChange={(p) => dispatch(fetchMaids({ page: p, limit, search, filter }))} />
 
       <ConfirmDialog
@@ -159,8 +187,6 @@ export default function MaidsListPage() {
         message={`Permanently delete ${deleteTarget?.name}'s profile? This cannot be undone.`}
         confirmLabel="Delete"
       />
-
-      <MaidHistoryModal maid={historyTarget} onClose={() => setHistoryTarget(null)} />
     </div>
   );
 }

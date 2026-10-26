@@ -5,6 +5,7 @@ import { fetchCategoryAnalytics } from '../features/analytics/analyticsSlice';
 import PageHeader from '../components/common/PageHeader';
 import { TextInput } from '../components/common/FormField';
 import Button from '../components/common/Button';
+import Loader from '../components/common/Loader';
 
 export default function AnalyticsPage() {
   const dispatch = useDispatch();
@@ -39,7 +40,7 @@ export default function AnalyticsPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         {status === 'loading' ? (
-          <p className="py-10 text-center text-sm text-gray-400">Loading…</p>
+          <Loader label="Loading analytics…" />
         ) : items.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-400">No analytics data for this period</p>
         ) : (

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Modal from '../../components/common/Modal';
-import { fetchMaidHistory, clearCurrentMaid } from '../../features/maids/maidsSlice';
+import Loader from '../../components/common/Loader';
+import { fetchMaidHistory, clearMaidHistory } from '../../features/maids/maidsSlice';
 import { formatDateTime } from '../../utils/formatDate';
 
 // Bookkeeping fields the backend diff picks up but that aren't real edits
@@ -107,19 +108,21 @@ function HistoryEntry({ entry }) {
 
 export default function MaidHistoryModal({ maid, onClose }) {
   const dispatch = useDispatch();
-  const history = useSelector((state) => state.maids.history);
+  const { history, historyStatus } = useSelector((state) => state.maids);
 
   useEffect(() => {
     if (maid?._id) dispatch(fetchMaidHistory(maid._id));
     return () => {
-      if (maid) dispatch(clearCurrentMaid());
+      if (maid) dispatch(clearMaidHistory());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maid]);
 
   return (
     <Modal open={!!maid} onClose={onClose} title={`History — ${maid?.name || ''}`}>
-      {history.length === 0 ? (
+      {historyStatus === 'loading' ? (
+        <Loader label="Loading history…" />
+      ) : history.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">No history recorded</p>
       ) : (
         <ul className="space-y-3">

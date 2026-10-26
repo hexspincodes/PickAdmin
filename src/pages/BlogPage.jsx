@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus, Pencil, Trash2, MessageSquare } from 'lucide-react';
+import { Plus, Pencil, Trash2, MessageSquare, Newspaper, CalendarDays, Heart } from 'lucide-react';
+import StatCards from '../components/common/StatCards';
 import { fetchAdminBlogs, createBlog, editBlog, deleteBlog, deleteBlogComment } from '../features/blog/blogSlice';
 import { generateSlugFromTitle } from '../features/blog/blogAPI';
 import PageHeader from '../components/common/PageHeader';
@@ -24,9 +25,42 @@ const emptyForm = {
   thumbnail: null,
 };
 
+// filter: what the table shows when the card is selected ('' = every post).
+const STAT_CARDS = [
+  { key: 'total', label: 'Total posts', filter: '', icon: Newspaper },
+  { key: 'month', label: 'This month', filter: 'month', icon: CalendarDays },
+  { key: 'comments', label: 'Comments', filter: 'commented', icon: MessageSquare },
+  { key: 'likes', label: 'Likes', filter: 'liked', icon: Heart },
+];
+
+const isThisMonth = (date) => {
+  const d = new Date(date);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+};
+
+const MATCHES = {
+  month: (b) => b.createdAt && isThisMonth(b.createdAt),
+  commented: (b) => (b.comments?.length || 0) > 0,
+  liked: (b) => (b.likes?.length || 0) > 0,
+};
+
 export default function BlogPage() {
   const dispatch = useDispatch();
   const { items, status } = useSelector((state) => state.blog);
+  const [cardFilter, setCardFilter] = useState('');
+
+  const counts = useMemo(() => {
+    if ((status === 'idle' || status === 'loading') && items.length === 0) return null;
+    return {
+      total: items.length,
+      month: items.filter(MATCHES.month).length,
+      comments: items.reduce((sum, b) => sum + (b.comments?.length || 0), 0),
+      likes: items.reduce((sum, b) => sum + (b.likes?.length || 0), 0),
+    };
+  }, [items, status]);
+
+  const rows = cardFilter ? items.filter(MATCHES[cardFilter]) : items;
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -114,13 +148,34 @@ export default function BlogPage() {
         title="Blog"
         description="Manage blog posts and comments"
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> New Post
-          </Button>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-full bg-gray-900 py-1.5 pl-1.5 pr-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500">
+              <Plus className="h-4 w-4" />
+            </span>
+            Create New Blog
+          </button>
         }
       />
 
-      <Table columns={columns} rows={items} loading={status === 'loading'} rowKey="_id" />
+      <StatCards
+        cards={STAT_CARDS}
+        counts={counts}
+        activeFilter={cardFilter}
+        onSelect={setCardFilter}
+        className="xl:grid-cols-4"
+      />
+
+      <Table
+        columns={columns}
+        rows={rows}
+        loading={status === 'loading' && items.length === 0}
+        rowKey="_id"
+        emptyMessage={cardFilter ? 'No posts match this card' : 'No blog posts yet'}
+      />
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? 'Edit Blog Post' : 'New Blog Post'} size="lg">
         <form onSubmit={handleSubmit} className="space-y-4">

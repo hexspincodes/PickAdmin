@@ -2,21 +2,40 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import toast from 'react-hot-toast';
 import * as customersAPI from './customersAPI';
 
+// Backend1 nests the page under `customer`: { customer: { data: [...], count } }
+const readPage = (res) => {
+  const payload = res.data?.customer;
+  const list = Array.isArray(payload) ? payload : payload?.data || [];
+  const count = (Array.isArray(payload) ? res.data?.count : payload?.count) || 0;
+  return { list, count };
+};
+
 export const fetchCustomers = createAsyncThunk(
   'customers/fetch',
   async ({ page = 1, search = '' } = {}, { rejectWithValue }) => {
     try {
-      const res = await customersAPI.getCustomers(page, search);
-      // Backend1 nests the page under `customer`: { customer: { data: [...], count } }
-      const payload = res.data?.customer;
-      const list = Array.isArray(payload) ? payload : payload?.data || [];
-      const count = (Array.isArray(payload) ? res.data?.count : payload?.count) || 0;
+      const { list, count } = readPage(await customersAPI.getCustomers(page, search));
       return { list, count, page, search };
     } catch (err) {
       return rejectWithValue(err.message);
     }
   },
 );
+
+// Every customer, for the status cards: the API has a fixed page size and no blocked filter,
+// so read page 1 for the total and fetch the remaining pages in parallel.
+export const fetchAllCustomers = createAsyncThunk('customers/fetchAll', async (_, { rejectWithValue }) => {
+  try {
+    const first = readPage(await customersAPI.getCustomers(1, ''));
+    const pages = Math.ceil(first.count / customersAPI.CUSTOMERS_PAGE_SIZE);
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, pages - 1) }, (_, i) => customersAPI.getCustomers(i + 2, '').then(readPage)),
+    );
+    return [first, ...rest].flatMap((p) => p.list);
+  } catch (err) {
+    return rejectWithValue(err.message);
+  }
+});
 
 export const resetCustomerPassword = createAsyncThunk(
   'customers/resetPassword',
@@ -40,20 +59,7 @@ export const toggleCustomerBlock = createAsyncThunk(
       toast.success(res.message || 'Status updated');
       const { page, search } = getState().customers;
       dispatch(fetchCustomers({ page, search }));
-    } catch (err) {
-      toast.error(err.message);
-      return rejectWithValue(err.message);
-    }
-  },
-);
-
-export const verifyCustomerPayment = createAsyncThunk(
-  'customers/verifyPayment',
-  async ({ user_id, transRef }, { rejectWithValue }) => {
-    try {
-      const res = await customersAPI.verifyCustomerPayment(user_id, transRef);
-      toast.success(res.message || 'Payment verified');
-      return res;
+      dispatch(fetchAllCustomers());
     } catch (err) {
       toast.error(err.message);
       return rejectWithValue(err.message);
@@ -63,7 +69,7 @@ export const verifyCustomerPayment = createAsyncThunk(
 
 const customersSlice = createSlice({
   name: 'customers',
-  initialState: { items: [], count: 0, status: 'idle', error: null, page: 1, search: '' },
+  initialState: { items: [], count: 0, status: 'idle', error: null, page: 1, search: '', all: [], allStatus: 'idle' },
   reducers: {},
   extraReducers: (builder) => {
     builder
@@ -80,6 +86,16 @@ const customersSlice = createSlice({
       .addCase(fetchCustomers.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      .addCase(fetchAllCustomers.pending, (state) => {
+        state.allStatus = 'loading';
+      })
+      .addCase(fetchAllCustomers.fulfilled, (state, action) => {
+        state.allStatus = 'succeeded';
+        state.all = action.payload;
+      })
+      .addCase(fetchAllCustomers.rejected, (state) => {
+        state.allStatus = 'failed';
       });
   },
 });

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus, Pencil, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, Sparkles } from 'lucide-react';
+import StatCards from '../components/common/StatCards';
 import { fetchSkills, createSkill, updateSkill, removeSkill } from '../features/skills/skillsSlice';
 import PageHeader from '../components/common/PageHeader';
 import Table from '../components/common/Table';
@@ -14,10 +15,18 @@ import { formatDateTime } from '../utils/formatDate';
 
 const emptyForm = { name: '', is_active: true };
 
+// filter: '' = all skills, 'active' / 'hidden' by is_active.
+const STAT_CARDS = [
+  { key: 'total', label: 'Total skills', filter: '', icon: Sparkles },
+  { key: 'active', label: 'Active', filter: 'active', icon: Eye },
+  { key: 'hidden', label: 'Hidden', filter: 'hidden', icon: EyeOff },
+];
+
 export default function SkillsPage() {
   const dispatch = useDispatch();
   const { items, status } = useSelector((state) => state.skills);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   // null = closed, {} = creating, a skill row = editing that skill
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -29,10 +38,20 @@ export default function SkillsPage() {
     dispatch(fetchSkills());
   }, [dispatch]);
 
+  const counts = useMemo(() => {
+    if ((status === 'idle' || status === 'loading') && items.length === 0) return null;
+    const active = items.filter((s) => s.is_active).length;
+    return { total: items.length, active, hidden: items.length - active };
+  }, [items, status]);
+
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return term ? items.filter((s) => s.name.toLowerCase().includes(term)) : items;
-  }, [items, search]);
+    return items.filter(
+      (s) =>
+        (!term || s.name.toLowerCase().includes(term)) &&
+        (!statusFilter || (statusFilter === 'active') === !!s.is_active),
+    );
+  }, [items, search, statusFilter]);
 
   const isEdit = !!editing?._id;
 
@@ -101,10 +120,25 @@ export default function SkillsPage() {
         title="Skills"
         description="Skills offered when adding or editing maid profiles"
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> New Skill
-          </Button>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-full bg-gray-900 py-1.5 pl-1.5 pr-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500">
+              <Plus className="h-4 w-4" />
+            </span>
+            Create New Skill
+          </button>
         }
+      />
+
+      <StatCards
+        cards={STAT_CARDS}
+        counts={counts}
+        activeFilter={statusFilter}
+        onSelect={setStatusFilter}
+        className="xl:grid-cols-3"
       />
 
       <SearchInput value={search} onChange={setSearch} placeholder="Search skills…" className="mb-4 max-w-sm" />
@@ -114,7 +148,7 @@ export default function SkillsPage() {
         rows={rows}
         loading={status === 'loading' && items.length === 0}
         rowKey="_id"
-        emptyMessage={search ? 'No skills match your search' : 'No skills yet'}
+        emptyMessage={search || statusFilter ? 'No skills match these filters' : 'No skills yet'}
       />
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title={isEdit ? 'Edit Skill' : 'New Skill'} size="sm">

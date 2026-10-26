@@ -1,29 +1,40 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleGuard from './components/auth/RoleGuard';
 import DashboardLayout from './components/layout/DashboardLayout';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import MaidsListPage from './pages/maids/MaidsListPage';
-import MaidFormPage from './pages/maids/MaidFormPage';
-import JobsPage from './pages/JobsPage';
-import BlogPage from './pages/BlogPage';
-import ContactPage from './pages/ContactPage';
-import SkillsPage from './pages/SkillsPage';
-import CustomersPage from './pages/CustomersPage';
-import PaymentsPage from './pages/PaymentsPage';
-import CouponsPage from './pages/CouponsPage';
-import TeamPage from './pages/TeamPage';
-import AnalyticsPage from './pages/AnalyticsPage';
+import Loader from './components/common/Loader';
 import { ROLES } from './utils/roles';
+
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const MaidsListPage = lazy(() => import('./pages/maids/MaidsListPage'));
+const MaidFormPage = lazy(() => import('./pages/maids/MaidFormPage'));
+const MaidDetailPage = lazy(() => import('./pages/maids/MaidDetailPage'));
+const JobsPage = lazy(() => import('./pages/JobsPage'));
+const BlogPage = lazy(() => import('./pages/BlogPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const SkillsPage = lazy(() => import('./pages/SkillsPage'));
+const CustomersPage = lazy(() => import('./pages/CustomersPage'));
+const PaymentsPage = lazy(() => import('./pages/PaymentsPage'));
+const CouponsPage = lazy(() => import('./pages/CouponsPage'));
+const TeamPage = lazy(() => import('./pages/TeamPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 
 export default function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/login"
+          element={
+            <Suspense fallback={<Loader fullPage />}>
+              <LoginPage />
+            </Suspense>
+          }
+        />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
@@ -42,6 +53,14 @@ export default function App() {
               element={
                 <RoleGuard allowed={[ROLES.SA, ROLES.A]}>
                   <MaidFormPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="maids/:id"
+              element={
+                <RoleGuard allowed={[ROLES.SA, ROLES.A]}>
+                  <MaidDetailPage />
                 </RoleGuard>
               }
             />

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import Loader from '../common/Loader';
 
 const MAX_DOTS = 12;
 
-export default function AnalyticsHistoryCard({ data = [] }) {
+export default function AnalyticsHistoryCard({ data = [], loading = false }) {
   const [hovered, setHovered] = useState(null);
 
   const columns = useMemo(() => {
@@ -46,7 +47,9 @@ export default function AnalyticsHistoryCard({ data = [] }) {
         </span>
       </div>
 
-      {columns.length === 0 ? (
+      {loading ? (
+        <Loader className="py-16" />
+      ) : columns.length === 0 ? (
         <p className="py-16 text-center text-sm text-gray-400">No analytics data yet</p>
       ) : (
         <div className="relative mt-6 flex h-56 items-end gap-3 overflow-x-auto pb-1">

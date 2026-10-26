@@ -13,6 +13,15 @@
   --color-brand-700: #ba430c;
   --color-brand-800: #943512;
   --color-brand-900: #782d12;
+
+  --animate-wiggle: wiggle 0.45s ease-in-out;
+
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-12deg); }
+    50% { transform: rotate(10deg); }
+    75% { transform: rotate(-6deg); }
+  }
 }
 
 html, body, #root {

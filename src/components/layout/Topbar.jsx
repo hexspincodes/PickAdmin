@@ -1,18 +1,17 @@
 import { useDispatch, useSelector } from 'react-redux';
-import { useLocation, useNavigate } from 'react-router-dom';
-import clsx from 'clsx';
-import { Bell, Download, ListFilter, LogOut, Menu, MessageSquare, Plus, Search } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Bell, ListFilter, LogOut, Menu, MessageSquare, Plus, Search } from 'lucide-react';
 import { toggleSidebar } from '../../features/ui/uiSlice';
 import { logout } from '../../features/auth/authSlice';
 import { NAV_ITEMS } from '../../config/nav';
-
-const AVATAR_COLORS = ['bg-brand-500', 'bg-gray-800', 'bg-brand-300'];
+import { ROLES } from '../../utils/roles';
 
 export default function Topbar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useSelector((state) => state.auth);
+  const canCreateMaid = user?.role === ROLES.SA || user?.role === ROLES.A;
 
   const pageLabel =
     NAV_ITEMS.find((item) => (item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)))?.label ||
@@ -49,23 +48,6 @@ export default function Topbar() {
       </button>
 
       <div className="ml-auto flex items-center gap-2">
-        <div className="hidden -space-x-2 sm:flex">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className={clsx(
-                'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-semibold text-white',
-                AVATAR_COLORS[i],
-              )}
-            >
-              {String.fromCharCode(65 + i)}
-            </span>
-          ))}
-          <button className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-gray-200 bg-white text-gray-400 hover:border-brand-300 hover:text-brand-500">
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
         <button className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
           <MessageSquare className="h-4.5 w-4.5" />
         </button>
@@ -75,15 +57,23 @@ export default function Topbar() {
         <button
           onClick={handleLogout}
           title={`Log out ${user?.user_id || ''}`}
-          className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-brand-600"
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-gray-200 px-2 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-600 sm:px-3.5"
         >
-          <LogOut className="h-4.5 w-4.5" />
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span className="hidden sm:inline">Logout</span>
         </button>
 
-        <button className="flex items-center gap-1.5 rounded-full bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600">
-          <Download className="h-4 w-4" />
-          <span className="hidden sm:inline">Export</span>
-        </button>
+        {canCreateMaid && (
+          <Link
+            to="/maids/new"
+            className="inline-flex items-center gap-2 rounded-full bg-brand-500 py-1.5 pl-1.5 pr-1.5 text-sm font-medium text-white shadow-sm shadow-brand-500/30 transition-colors hover:bg-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:pr-4"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20">
+              <Plus className="h-4 w-4" />
+            </span>
+            <span className="hidden sm:inline">Create Maid</span>
+          </Link>
+        )}
       </div>
     </header>
   );

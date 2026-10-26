@@ -15,6 +15,7 @@ import {
 } from '../../features/maids/maidsSlice';
 import PageHeader from '../../components/common/PageHeader';
 import Button from '../../components/common/Button';
+import Loader from '../../components/common/Loader';
 import { TextInput, Select, Checkbox, FileInput } from '../../components/common/FormField';
 import CountrySelect from '../../components/common/CountrySelect';
 import RichTextEditor from '../../components/common/RichTextEditor';
@@ -184,8 +185,8 @@ function Row({ label, htmlFor, required, error, hint, className = '', children }
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
-      {hint && !error && <span className="mt-1 block text-xs text-gray-400">{hint}</span>}
-      {error && <span className="mt-1 block text-xs text-red-500">{error}</span>}
+      {hint && !error && <span className="mt-1 block text-sm text-gray-400">{hint}</span>}
+      {error && <span className="mt-1 block text-sm text-red-500">{error}</span>}
     </div>
   );
 }
@@ -217,7 +218,7 @@ function ChipMultiSelect({ id, values, onChange, options }) {
             type="button"
             aria-pressed={on}
             onClick={() => toggle(o.value)}
-            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               on ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-300 text-gray-700 hover:border-brand-500 hover:text-brand-600'
             }`}
           >
@@ -234,7 +235,7 @@ function PhoneRow({ id, label, code, number, onCode, onNumber }) {
   return (
     <Row label={label} htmlFor={id}>
       <div className="flex rounded-lg border border-gray-300 bg-white focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500">
-        <div className="shrink-0 border-r border-gray-200">
+        <div className="flex shrink-0 border-r border-gray-200">
           <CountrySelect mode="dial" value={code} onChange={onCode} ariaLabel={`${label} country code`} />
         </div>
         <input
@@ -251,6 +252,11 @@ function PhoneRow({ id, label, code, number, onCode, onNumber }) {
 }
 
 const sectionCls = 'rounded-xl border border-gray-200 bg-white p-5';
+
+// One step larger field text on this form only — the inputs are shared components used across the panel.
+const FIELD_TEXT_CLS =
+  '[&_input]:text-base [&_select]:text-base [&_textarea]:text-base [&_label]:text-base ' +
+  '[&_button[aria-haspopup=listbox]]:text-base [&_[contenteditable]]:text-base';
 
 export default function MaidFormPage() {
   const { id } = useParams();
@@ -393,13 +399,14 @@ export default function MaidFormPage() {
     const action = isEdit ? updateMaid(fields) : createMaid(fields);
     const result = await dispatch(action);
     setSubmitting(false);
+    // Create returns only a message (no new id), so new profiles land back on the list.
     if ((isEdit ? updateMaid : createMaid).fulfilled.match(result)) {
-      navigate('/maids');
+      navigate(isEdit ? `/maids/${id}` : '/maids');
     }
   };
 
   if (isEdit && currentStatus === 'loading') {
-    return <p className="text-sm text-gray-500">Loading maid profile…</p>;
+    return <Loader label="Loading maid profile…" className="py-24" />;
   }
 
   const profileSrc = profilePreview || (isEdit && current?.profile ? mediaUrl(current.profile) : null);
@@ -409,6 +416,7 @@ export default function MaidFormPage() {
     <div className="w-full">
       <PageHeader
         title={isEdit ? `Edit Maid — ${form.name || ''}` : 'Add New Maid'}
+        titleClassName="text-2xl"
         actions={
           isEdit && (
             <div className="flex flex-wrap gap-2">
@@ -455,7 +463,7 @@ export default function MaidFormPage() {
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} noValidate className="space-y-6">
+      <form onSubmit={handleSubmit} noValidate className={`space-y-6 ${FIELD_TEXT_CLS}`}>
         {/* ── Personal Details ── */}
         {tab === 0 && (
           <section className={sectionCls}>
@@ -633,7 +641,7 @@ export default function MaidFormPage() {
                       type="button"
                       aria-pressed={on}
                       onClick={() => toggleSkill(skill)}
-                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                         on ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-300 text-gray-700 hover:border-brand-500 hover:text-brand-600'
                       }`}
                     >
@@ -791,7 +799,7 @@ export default function MaidFormPage() {
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Button type="button" variant="secondary" onClick={() => navigate('/maids')}>
+          <Button type="button" variant="secondary" onClick={() => navigate(isEdit ? `/maids/${id}` : '/maids')}>
             Cancel
           </Button>
           <div className="flex gap-2">
