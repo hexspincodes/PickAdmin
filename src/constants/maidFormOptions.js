@@ -92,11 +92,11 @@ export const SKILLS = [
   "Cleaning/Housekeeping",
 ];
 
-// Stored in the `option` field.
+// Stored in the `option` list; pick both for a maid who does either. Older profiles'
+// "Live In And Live Out" is loaded as both (see toList in MaidFormPage).
 export const LIVE_OPTIONS = [
   { value: "Live In", label: "Live-In" },
   { value: "Live Out", label: "Live-Out" },
-  { value: "Live In And Live Out", label: "Live In And Live Out" },
 ];
 
 export const LANGUAGES = [

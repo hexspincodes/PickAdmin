@@ -75,9 +75,9 @@ const emptyForm = {
   age: '',
   marital_status: '',
   nationality: '',
-  location: '',
+  location: [],
   religion: '',
-  service: '',
+  service: [],
   salaryOption: '',
   education: '',
   email: '',
@@ -97,7 +97,7 @@ const emptyForm = {
   visa_status: '',
   visa_expire: '',
   skills: [],
-  option: '',
+  option: [],
   languages: [],
   // Employment history
   employmentHistory: [],
@@ -112,6 +112,13 @@ const dateOnly = (value) => (value ? String(value).slice(0, 10) : '');
 // Keeps a value from an older profile selectable even if it isn't one of today's options.
 const withCurrent = (options, value) =>
   value && !options.some((o) => o.value === value) ? [...options, { value, label: value.replace('-', ' to ') }] : options;
+
+// `location`, `service` and `option` are lists; older profiles store one string, and
+// "Live In And Live Out" means both arrangements.
+const toList = (value) =>
+  [...new Set((Array.isArray(value) ? value : value ? [value] : []).flatMap((v) =>
+    v === 'Live In And Live Out' ? ['Live In', 'Live Out'] : [v]
+  ))];
 
 // Empty numbers default to the UAE code; older numbers saved without "+" keep no code so they're saved as typed.
 const phoneFields = (value) => {
@@ -130,9 +137,9 @@ function toForm(maid) {
     age: maid.age ?? '',
     marital_status: maid.marital_status ?? '',
     nationality: maid.nationality ?? '',
-    location: maid.location ?? '',
+    location: toList(maid.location),
     religion: maid.religion ?? '',
-    service: maid.service ?? '',
+    service: toList(maid.service),
     salaryOption: salaryToOption(maid.salary, maid.is_negotiable_salary),
     education: maid.education ?? '',
     email: maid.email ?? '',
@@ -150,7 +157,7 @@ function toForm(maid) {
     visa_status: maid.visa_status ?? '',
     visa_expire: dateOnly(maid.visa_expire),
     skills: maid.skills || [],
-    option: maid.option ?? '',
+    option: toList(maid.option),
     languages: (maid.language || []).map((l) => ({
       name: l.name ?? '',
       read: String(l.read ?? 0),
@@ -193,6 +200,33 @@ function OptionSelect({ id, value, onChange, options, placeholder }) {
         </option>
       ))}
     </Select>
+  );
+}
+
+// Toggle chips for picking several values; values from older profiles that aren't options stay selectable.
+function ChipMultiSelect({ id, values, onChange, options }) {
+  const all = [...options, ...values.filter((v) => !options.some((o) => o.value === v)).map((v) => ({ value: v, label: v }))];
+  const toggle = (value) => onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  return (
+    <div id={id} role="group" className="flex flex-wrap gap-2">
+      {all.map((o) => {
+        const on = values.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={on}
+            onClick={() => toggle(o.value)}
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              on ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-300 text-gray-700 hover:border-brand-500 hover:text-brand-600'
+            }`}
+          >
+            {on ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -471,14 +505,8 @@ export default function MaidFormPage() {
                   hasError={!!errors.nationality}
                 />
               </Row>
-              <Row label="Location" htmlFor="m_location" required error={errors.location}>
-                <OptionSelect
-                  id="m_location"
-                  value={form.location}
-                  onChange={set('location')}
-                  options={withCurrent(LOCATIONS, form.location)}
-                  placeholder="Select Location"
-                />
+              <Row label="Location" required error={errors.location} hint="Select all that apply." className="sm:col-span-2">
+                <ChipMultiSelect id="m_location" values={form.location} onChange={setValue('location')} options={LOCATIONS} />
               </Row>
               <Row label="Religion" htmlFor="m_religion" required error={errors.religion}>
                 <OptionSelect
@@ -489,14 +517,8 @@ export default function MaidFormPage() {
                   placeholder="Select Religion"
                 />
               </Row>
-              <Row label="Service" htmlFor="m_service" required error={errors.service}>
-                <OptionSelect
-                  id="m_service"
-                  value={form.service}
-                  onChange={set('service')}
-                  options={withCurrent(SERVICES, form.service)}
-                  placeholder="Select Service"
-                />
+              <Row label="Service" required error={errors.service} hint="Select all that apply." className="sm:col-span-2">
+                <ChipMultiSelect id="m_service" values={form.service} onChange={setValue('service')} options={SERVICES} />
               </Row>
               <Row label="Salary (AED / month)" htmlFor="m_salary" required error={errors.salaryOption}>
                 <OptionSelect
@@ -593,20 +615,15 @@ export default function MaidFormPage() {
                 <Row label="Visa expire" htmlFor="m_visa_expire">
                   <TextInput id="m_visa_expire" type="date" value={form.visa_expire} onChange={set('visa_expire')} />
                 </Row>
-                <Row label="Options" htmlFor="m_option" className="sm:col-span-2">
-                  <OptionSelect
-                    id="m_option"
-                    value={form.option}
-                    onChange={set('option')}
-                    options={withCurrent(LIVE_OPTIONS, form.option)}
-                    placeholder="Select Options"
-                  />
+                <Row label="Options" hint="Select all that apply." className="sm:col-span-2">
+                  <ChipMultiSelect id="m_option" values={form.option} onChange={setValue('option')} options={LIVE_OPTIONS} />
                 </Row>
               </div>
             </section>
 
             <section className={sectionCls}>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Skills</h3>
+              <h3 className="mb-1 text-sm font-semibold text-gray-700">Skills</h3>
+              <p className="mb-3 text-xs text-gray-500">Select all that apply.</p>
               <div className="flex flex-wrap gap-2">
                 {[...skillOptions, ...extraSkills].map((skill) => {
                   const on = form.skills.includes(skill);
