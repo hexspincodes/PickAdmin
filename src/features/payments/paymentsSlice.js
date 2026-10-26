@@ -29,6 +29,22 @@ export const manualVerifyPayment = createAsyncThunk(
   },
 );
 
+export const updatePayment = createAsyncThunk(
+  'payments/update',
+  async ({ id, ...changes }, { dispatch, getState, rejectWithValue }) => {
+    try {
+      const res = await paymentsAPI.updatePayment(id, changes);
+      toast.success(res.message || 'Payment updated');
+      const { page, limit, search } = getState().payments;
+      dispatch(fetchPayments({ page, limit, search }));
+      return res.data?.payment;
+    } catch (err) {
+      toast.error(err.message);
+      return rejectWithValue(err.message);
+    }
+  },
+);
+
 const paymentsSlice = createSlice({
   name: 'payments',
   initialState: { items: [], count: 0, status: 'idle', error: null, page: 1, limit: 100, search: '' },

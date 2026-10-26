@@ -8,6 +8,15 @@ export function formatDate(date) {
   return `${dd}/${mm}/${yy}`;
 }
 
+/** Value for an <input type="datetime-local"> (local time, "YYYY-MM-DDTHH:mm"), or '' if unset. */
+export function toDateTimeLocal(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function formatDateTime(date) {
   if (!date) return '—';
   const d = new Date(date);

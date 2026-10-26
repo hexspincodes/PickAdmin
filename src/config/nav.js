@@ -9,6 +9,7 @@ import {
   Mail,
   BarChart3,
   Sparkles,
+  TicketPercent,
 } from 'lucide-react';
 import { ROLES } from '../utils/roles';
 
@@ -21,6 +22,7 @@ export const NAV_ITEMS = [
   { to: '/skills', label: 'Skills', icon: Sparkles, roles: [ROLES.SA, ROLES.A], group: 'main' },
   { to: '/customers', label: 'Customers', icon: UsersRound, roles: [ROLES.SA], group: 'other' },
   { to: '/payments', label: 'Payments', icon: Wallet, roles: [ROLES.SA], group: 'other' },
+  { to: '/coupons', label: 'Coupons', icon: TicketPercent, roles: [ROLES.SA], group: 'other' },
   { to: '/team', label: 'Admin Team', icon: UserCog, roles: [ROLES.SA], group: 'other' },
   { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: [ROLES.SA], group: 'other' },
 ];

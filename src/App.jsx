@@ -13,6 +13,7 @@ import ContactPage from './pages/ContactPage';
 import SkillsPage from './pages/SkillsPage';
 import CustomersPage from './pages/CustomersPage';
 import PaymentsPage from './pages/PaymentsPage';
+import CouponsPage from './pages/CouponsPage';
 import TeamPage from './pages/TeamPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import { ROLES } from './utils/roles';
@@ -103,6 +104,15 @@ export default function App() {
               element={
                 <RoleGuard allowed={[ROLES.SA]}>
                   <PaymentsPage />
+                </RoleGuard>
+              }
+            />
+
+            <Route
+              path="coupons"
+              element={
+                <RoleGuard allowed={[ROLES.SA]}>
+                  <CouponsPage />
                 </RoleGuard>
               }
             />

@@ -8,6 +8,7 @@ import jobsReducer from '../features/jobs/jobsSlice';
 import blogReducer from '../features/blog/blogSlice';
 import contactReducer from '../features/contact/contactSlice';
 import skillsReducer from '../features/skills/skillsSlice';
+import couponsReducer from '../features/coupons/couponsSlice';
 import analyticsReducer from '../features/analytics/analyticsSlice';
 import uiReducer from '../features/ui/uiSlice';
 
@@ -22,6 +23,7 @@ export const store = configureStore({
     blog: blogReducer,
     contact: contactReducer,
     skills: skillsReducer,
+    coupons: couponsReducer,
     analytics: analyticsReducer,
     ui: uiReducer,
   },

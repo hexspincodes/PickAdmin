@@ -7,3 +7,8 @@ export const getPayments = (page = 1, limit = 10, search = '') =>
 // POST /api/v1/payment/manual-verify — Backend2, no auth gate on the API side, gated here by role UI
 export const manualVerifyPayment = (user_id) =>
   unwrap(api2.post('/api/v1/payment/manual-verify', { user_id }));
+
+// PATCH /api/v1/payment/:id — Backend2, JWT, SA only. Body: { expiryDate?, status? }.
+// status 1 (active) is rejected unless the expiry is in the future.
+export const updatePayment = (id, payload) =>
+  unwrap(api2.patch(`/api/v1/payment/${id}`, payload));
