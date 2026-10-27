@@ -5,6 +5,10 @@ import { toFormData } from '../../utils/toFormData';
 export const getAdminBlogs = (page = 1, search = '') =>
   unwrap(api1.get('/api/v1/blog/blogs-admin', { params: { page, search } }));
 
+// GET /api/v1/blog/id/:id — Backend1, public. `:id` is the slug. Unlike blogs-admin, this
+// returns every editable field (description, content, meta/OG, canonical_url).
+export const getBlogBySlug = (slug) => unwrap(api1.get(`/api/v1/blog/id/${slug}`));
+
 // POST /api/v1/blog/ — Backend1, JWT, SA/Marketing, multipart/form-data
 export const createBlog = (fields) =>
   unwrap(api1.post('/api/v1/blog/', toFormData(fields), { headers: { 'Content-Type': 'multipart/form-data' } }));

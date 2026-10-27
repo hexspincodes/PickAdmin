@@ -1,41 +1,47 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
-import { Filter, MoreHorizontal, Pencil, Plus, Share2, UserRound } from 'lucide-react';
-import { fetchMaidCounts } from '../features/maids/maidsSlice';
-import { fetchCategoryAnalytics } from '../features/analytics/analyticsSlice';
+import { Link, useNavigate } from 'react-router-dom';
+import { Briefcase, Clock, EyeOff, Pencil, Plus, Users } from 'lucide-react';
+import { fetchAllPayments } from '../features/payments/paymentsSlice';
+import { fetchMaidStatusCounts } from '../features/maids/maidsSlice';
+import StatCards from '../components/common/StatCards';
+import { amountAED } from '../features/payments/paymentUtils';
+import { isPaidPayment } from '../components/payments/PaymentPeriodCards';
+import RevenueCards from '../components/dashboard/RevenueCards';
+import MonthlyRevenueChart from '../components/dashboard/MonthlyRevenueChart';
+import OverviewCards from '../components/dashboard/OverviewCards';
 import { ROLES } from '../utils/roles';
-import TimelineProgressCard from '../components/dashboard/TimelineProgressCard';
-import ActiveStatCard from '../components/dashboard/ActiveStatCard';
-import DonutStatCard from '../components/dashboard/DonutStatCard';
-import AnalyticsHistoryCard from '../components/dashboard/AnalyticsHistoryCard';
-import ProjectHistoryCard from '../components/dashboard/ProjectHistoryCard';
-import AssignmentsCard from '../components/dashboard/AssignmentsCard';
-import Loader from '../components/common/Loader';
-import { formatDate } from '../utils/formatDate';
+
+// filter: the Maids Management list filter the card opens with.
+const MAID_CARDS = [
+  { key: 'total', label: 'Total maids', filter: '', icon: Users },
+  { key: 'pending', label: 'Pending maids', filter: 'pending', icon: Clock },
+  { key: 'disabled', label: 'Disabled maids', filter: 'disabled', icon: EyeOff },
+  { key: 'hired', label: 'Hired maids', filter: 'hired', icon: Briefcase },
+];
+
+const SectionTitle = ({ children }) => (
+  <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">{children}</h2>
+);
 
 export default function DashboardPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
-  const { counts, countsStatus } = useSelector((state) => state.maids);
-  const { items: analytics, status: analyticsStatus } = useSelector((state) => state.analytics);
-  const countsLoading = !counts && countsStatus !== 'failed';
+  const { all, allStatus } = useSelector((state) => state.payments);
+  const statusCounts = useSelector((state) => state.maids.statusCounts);
+  // The payments API is Super Admin only; Maids Management is Super Admin and Admin.
+  const canSeeRevenue = user?.role === ROLES.SA;
+  const canCreateMaid = user?.role === ROLES.SA || user?.role === ROLES.A;
+  const canSeeMaids = canCreateMaid;
 
   useEffect(() => {
-    dispatch(fetchMaidCounts());
-    if (user?.role === ROLES.SA) dispatch(fetchCategoryAnalytics({}));
-  }, [dispatch, user]);
+    if (canSeeRevenue) dispatch(fetchAllPayments());
+    if (canSeeMaids) dispatch(fetchMaidStatusCounts());
+  }, [dispatch, canSeeRevenue, canSeeMaids]);
 
-  const total = counts?.total ?? 0;
-  const verified = counts?.verified ?? 0;
-  const featured = counts?.featured ?? 0;
-  const verifiedPercent = total ? Math.round((verified / total) * 100) : 0;
-  const featuredPercent = total ? Math.round((featured / total) * 100) : 0;
-
-  const today = new Date();
-  const start = new Date(today.getFullYear(), 0, 1);
-  const end = new Date(today.getFullYear(), 11, 31);
-  const canCreateMaid = user?.role === ROLES.SA || user?.role === ROLES.A;
+  const paid = useMemo(() => all.filter(isPaidPayment), [all]);
+  const revenueLoading = allStatus !== 'succeeded' && all.length === 0;
 
   return (
     <div className="space-y-5">
@@ -45,80 +51,53 @@ export default function DashboardPage() {
             <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
             <Pencil className="h-3.5 w-3.5 text-gray-300" />
           </div>
-          <p className="mt-1 max-w-lg text-sm text-gray-400">
-            Manage maid applications, assign roles and keep track of platform activity.
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-500">
-              <Share2 className="h-3 w-3" /> Shared
-            </span>
-            <button className="text-gray-300 hover:text-gray-500">
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
-            <UserRound className="h-4 w-4 text-gray-400" /> Person
-          </button>
-          <button className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
-            <Filter className="h-4 w-4 text-gray-400" /> Category Filter
-          </button>
-          {canCreateMaid && (
+        {canCreateMaid && (
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               to="/maids/new"
               className="flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
             >
-              <Plus className="h-4 w-4" /> New Application
+              <Plus className="h-4 w-4" /> Create New Maid
             </Link>
-          )}
-          <button className="flex items-center gap-2 rounded-full border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-500 hover:border-brand-300 hover:text-brand-600">
-            <Plus className="h-4 w-4" /> Add Widget
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
-      {countsLoading ? (
-        <div className="rounded-3xl border border-gray-100 bg-white shadow-sm">
-          <Loader label="Loading stats…" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <TimelineProgressCard
-            title="Verification Progress"
-            percent={verifiedPercent}
-            startDate={formatDate(start)}
-            endDate={formatDate(end)}
-            todayDate={formatDate(today)}
+      {canSeeMaids && (
+        <section>
+          <SectionTitle>Maids</SectionTitle>
+          <StatCards
+            cards={MAID_CARDS}
+            counts={statusCounts}
+            activeFilter={null}
+            onSelect={(filter) => navigate('/maids', { state: { filter } })}
+            className="md:grid-cols-4"
           />
-          <ActiveStatCard
-            title="New Applications"
-            badge={`${total}`}
-            value={total}
-            caption="applications total"
-            data={[4, 7, 5, 9, 6, 12, 8]}
-          />
-          <DonutStatCard
-            title="Featured Maids"
-            badge={`${featuredPercent}%`}
-            value={featured}
-            caption="of total applications"
-            percent={featuredPercent}
-          />
-        </div>
+        </section>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-3">
-          <AnalyticsHistoryCard data={analytics} loading={analyticsStatus === 'loading'} />
-        </div>
-        <div className="lg:col-span-2">
-          <ProjectHistoryCard />
-        </div>
-      </div>
+      {canSeeRevenue && (
+        <section>
+          <SectionTitle>Revenue</SectionTitle>
+          {allStatus === 'failed' ? (
+            <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">Couldn&apos;t load revenue. Refresh to try again.</p>
+          ) : (
+            <div className="space-y-4">
+              <RevenueCards paid={paid} amountOf={amountAED} loading={revenueLoading} />
+              <MonthlyRevenueChart paid={paid} amountOf={amountAED} loading={revenueLoading} />
+            </div>
+          )}
+        </section>
+      )}
 
-      <AssignmentsCard />
+      {[ROLES.SA, ROLES.A, ROLES.MARKETING].includes(user?.role) && (
+        <section>
+          <SectionTitle>Overview</SectionTitle>
+          <OverviewCards role={user.role} />
+        </section>
+      )}
     </div>
   );
 }

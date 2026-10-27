@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { Plus, Video, SlidersHorizontal, X } from 'lucide-react';
 import { fetchMaids, fetchMaidStatusCounts, deleteMaid } from '../../features/maids/maidsSlice';
@@ -25,14 +25,16 @@ const FILTERS = [
 export default function MaidsListPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  // The dashboard's maid cards link here with { filter } in the route state.
+  const initialFilter = useLocation().state?.filter || '';
   const { items, count, status, page, limit, search, filter, statusCounts } = useSelector((state) => state.maids);
   const [searchInput, setSearchInput] = useState(search);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
-    dispatch(fetchMaids({ page: 1, limit: 100, search: '', filter: '' }));
+    dispatch(fetchMaids({ page: 1, limit: 100, search: '', filter: initialFilter }));
     dispatch(fetchMaidStatusCounts());
-  }, [dispatch]);
+  }, [dispatch, initialFilter]);
 
   useEffect(() => {
     const t = setTimeout(() => {

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // Lightweight rich-text editor (contentEditable + execCommand, no dependency) that emits HTML.
 // Port of pick_frontend src/components/ui/RichTextEditor.tsx — keep the toolbar in sync.
 
-const CONTENT_CLS =
+export const CONTENT_CLS =
   '[&_h1]:text-xl [&_h1]:font-bold [&_h1]:my-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:my-2 ' +
   '[&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 ' +
   '[&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-3 [&_blockquote]:text-gray-500 [&_blockquote]:my-2 ' +

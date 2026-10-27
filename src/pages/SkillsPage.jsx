@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus, Pencil, Trash2, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Plus, Eye, EyeOff, Sparkles } from 'lucide-react';
+import IconActionButton from '../components/common/IconActionButton';
 import StatCards from '../components/common/StatCards';
 import { fetchSkills, createSkill, updateSkill, removeSkill } from '../features/skills/skillsSlice';
 import PageHeader from '../components/common/PageHeader';
@@ -14,6 +15,10 @@ import { Field, TextInput, Checkbox } from '../components/common/FormField';
 import { formatDateTime } from '../utils/formatDate';
 
 const emptyForm = { name: '', is_active: true };
+
+// Falls back to the creation time embedded in a Mongo ObjectId (first 8 hex chars = seconds).
+const createdAtOf = (row) =>
+  row.createdAt || (/^[0-9a-f]{24}$/i.test(row._id || '') ? new Date(parseInt(row._id.slice(0, 8), 16) * 1000) : null);
 
 // filter: '' = all skills, 'active' / 'hidden' by is_active.
 const STAT_CARDS = [
@@ -89,26 +94,20 @@ export default function SkillsPage() {
       header: 'Status',
       render: (row) => (row.is_active ? <Badge tone="green">Active</Badge> : <Badge tone="gray">Hidden</Badge>),
     },
+    { key: 'createdAt', header: 'Created', render: (row) => formatDateTime(createdAtOf(row)) },
     { key: 'updatedAt', header: 'Last updated', render: (row) => formatDateTime(row.updatedAt) },
     {
       key: 'actions',
       header: '',
       render: (row) => (
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
+        <div className="flex flex-wrap justify-end gap-2">
+          <IconActionButton
+            action={row.is_active ? 'hide' : 'show'}
+            label={row.is_active ? `Hide ${row.name} from maid forms` : `Show ${row.name} on maid forms`}
             onClick={() => dispatch(updateSkill({ id: row._id, is_active: !row.is_active }))}
-            title={row.is_active ? 'Hide from maid forms' : 'Show on maid forms'}
-          >
-            {row.is_active ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => openEdit(row)} title="Edit">
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => setDeleteTarget(row)} title="Delete">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          />
+          <IconActionButton action="edit" label={`Edit ${row.name}`} onClick={() => openEdit(row)} />
+          <IconActionButton action="delete" label={`Delete ${row.name}`} onClick={() => setDeleteTarget(row)} />
         </div>
       ),
     },

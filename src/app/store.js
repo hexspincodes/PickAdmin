@@ -4,7 +4,6 @@ import teamReducer from '../features/team/teamSlice';
 import customersReducer from '../features/customers/customersSlice';
 import paymentsReducer from '../features/payments/paymentsSlice';
 import maidsReducer from '../features/maids/maidsSlice';
-import jobsReducer from '../features/jobs/jobsSlice';
 import blogReducer from '../features/blog/blogSlice';
 import contactReducer from '../features/contact/contactSlice';
 import skillsReducer from '../features/skills/skillsSlice';
@@ -19,7 +18,6 @@ export const store = configureStore({
     customers: customersReducer,
     payments: paymentsReducer,
     maids: maidsReducer,
-    jobs: jobsReducer,
     blog: blogReducer,
     contact: contactReducer,
     skills: skillsReducer,

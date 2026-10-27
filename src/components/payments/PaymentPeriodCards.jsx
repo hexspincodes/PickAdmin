@@ -14,8 +14,11 @@ export const paidAt = (row) => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-/** [start, end) in local time for a period key, or null for "all". customDay is "YYYY-MM-DD". */
-export function periodRange(key, customDay, now = new Date()) {
+/**
+ * [start, end) in local time for a period key, or null for "all".
+ * customDay is "YYYY-MM-DD"; customMonth is "YYYY-MM".
+ */
+export function periodRange(key, customDay, customMonth, now = new Date()) {
   const today = startOfDay(now);
   switch (key) {
     case 'today':
@@ -23,10 +26,9 @@ export function periodRange(key, customDay, now = new Date()) {
     case 'yesterday':
       return [new Date(today.getTime() - DAY), today];
     case 'week': {
-      // Weeks start on Monday.
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-      return [monday, new Date(today.getTime() + DAY)];
+      // Weeks start on Monday (the UAE working week).
+      const sinceMonday = (today.getDay() + 6) % 7;
+      return [new Date(today.getFullYear(), today.getMonth(), today.getDate() - sinceMonday), new Date(today.getTime() + DAY)];
     }
     case 'month':
       return [new Date(today.getFullYear(), today.getMonth(), 1), new Date(today.getTime() + DAY)];
@@ -35,6 +37,11 @@ export function periodRange(key, customDay, now = new Date()) {
       const [y, m, d] = customDay.split('-').map(Number);
       const start = new Date(y, m - 1, d);
       return [start, new Date(y, m - 1, d + 1)];
+    }
+    case 'customMonth': {
+      if (!customMonth) return null;
+      const [y, m] = customMonth.split('-').map(Number);
+      return [new Date(y, m - 1, 1), new Date(y, m, 1)];
     }
     default:
       return null;
@@ -47,8 +54,8 @@ const CARDS = [
   { key: 'today', label: 'Today', icon: CalendarCheck },
   { key: 'yesterday', label: 'Yesterday', icon: CalendarClock },
   { key: 'custom', label: 'Custom day', icon: CalendarSearch },
-  { key: 'week', label: 'This week', icon: CalendarDays },
   { key: 'month', label: 'This month', icon: CalendarRange },
+  { key: 'customMonth', label: 'Custom month', icon: CalendarDays },
   { key: 'all', label: 'All time', icon: Wallet },
 ];
 
@@ -61,11 +68,21 @@ const formatAED =(value) => value.toLocaleString('en-AE', { maximumFractionDigit
  * Revenue cards per period. Click a card to filter the table to that period (click again to clear).
  * paid: paid payments; amountOf(row): AED charged; loading: show placeholders.
  */
-export default function PaymentPeriodCards({ paid, amountOf, loading, activePeriod, onSelect, customDay, onCustomDayChange }) {
+export default function PaymentPeriodCards({
+  paid,
+  amountOf,
+  loading,
+  activePeriod,
+  onSelect,
+  customDay,
+  onCustomDayChange,
+  customMonth,
+  onCustomMonthChange,
+}) {
   const totals = Object.fromEntries(
     CARDS.map(({ key }) => {
-      const range = periodRange(key, customDay);
-      const rows = key === 'custom' && !range ? [] : paid.filter((row) => inRange(paidAt(row), range));
+      const range = periodRange(key, customDay, customMonth);
+      const rows = key !== 'all' && !range ? [] : paid.filter((row) => inRange(paidAt(row), range));
       return [key, { count: rows.length, amount: rows.reduce((sum, row) => sum + (amountOf(row) || 0), 0) }];
     }),
   );
@@ -114,6 +131,21 @@ export default function PaymentPeriodCards({ paid, amountOf, loading, activePeri
               />
             )}
 
+            {key === 'customMonth' && (
+              <input
+                type="month"
+                value={customMonth}
+                max={new Date().toLocaleDateString('en-CA').slice(0, 7)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  onCustomMonthChange(e.target.value);
+                  if (e.target.value) onSelect('customMonth');
+                }}
+                aria-label="Pick a month"
+                className="-mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700 outline-none focus:border-brand-300 focus:bg-white"
+              />
+            )}
+
             <span className="flex items-end justify-between gap-3">
               <span className="min-w-0">
                 {loading ? (
@@ -126,6 +158,8 @@ export default function PaymentPeriodCards({ paid, amountOf, loading, activePeri
                 )}
                 {key === 'custom' && !customDay ? (
                   <span className="mt-2 block text-xs text-gray-500">Pick a day</span>
+                ) : key === 'customMonth' && !customMonth ? (
+                  <span className="mt-2 block text-xs text-gray-500">Pick a month</span>
                 ) : (
                   <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-200">
                     <span className="text-sm font-bold text-brand-600">{count}</span>

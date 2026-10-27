@@ -13,4 +13,11 @@ export const statusLabel = (row) => {
 
 export const amountAED = (row) => (row.amount != null ? row.amount / 100 : PLAN_PRICE[row.type]);
 
+// Sort key matching the dates shown: when it was paid, or when it was created for pending / older records.
+const paymentTime = (row) => {
+  const t = new Date((row.status !== 0 && row.paymentDate) || row.createdAt).getTime();
+  return Number.isNaN(t) ? 0 : t;
+};
+export const byNewest = (a, b) => paymentTime(b) - paymentTime(a);
+
 export const formatAED = (value) => (value ?? 0).toLocaleString('en-AE', { maximumFractionDigits: 2 });

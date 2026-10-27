@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { ArrowLeft, CalendarClock, Pencil, ReceiptText, Wallet } from 'lucide-react';
 import { fetchAllPayments } from '../../features/payments/paymentsSlice';
-import { STATUS_TONE, PLAN_LABEL, statusLabel, amountAED, formatAED } from '../../features/payments/paymentUtils';
+import { STATUS_TONE, PLAN_LABEL, statusLabel, amountAED, formatAED, byNewest } from '../../features/payments/paymentUtils';
 import { isPaidPayment } from './PaymentPeriodCards';
 import Modal from '../common/Modal';
 import Badge from '../common/Badge';
@@ -41,7 +41,7 @@ export default function CustomerPaymentsModal({ customer, onClose }) {
   const payments = useMemo(
     () =>
       customer
-        ? all.filter((p) => p.user_id === customer.user_id).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        ? all.filter((p) => p.user_id === customer.user_id).sort(byNewest)
         : [],
     [all, customer],
   );

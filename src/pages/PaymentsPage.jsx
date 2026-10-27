@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { BadgeCheck, Calendar, Filter, Pencil, RotateCcw } from 'lucide-react';
-import { fetchPayments, fetchAllPayments, manualVerifyPayment } from '../features/payments/paymentsSlice';
-import { STATUS_TONE, PLAN_LABEL, statusLabel, amountAED } from '../features/payments/paymentUtils';
+import { Calendar, Filter, Pencil, RotateCcw } from 'lucide-react';
+import { fetchPayments, fetchAllPayments } from '../features/payments/paymentsSlice';
+import { STATUS_TONE, PLAN_LABEL, statusLabel, amountAED, byNewest } from '../features/payments/paymentUtils';
+import InvoiceButton from '../components/payments/InvoiceButton';
 import PaymentPeriodCards, { isPaidPayment, paidAt, periodRange, inRange } from '../components/payments/PaymentPeriodCards';
 import EditPaymentForm from '../components/payments/EditPaymentForm';
 import PageHeader from '../components/common/PageHeader';
@@ -23,8 +24,12 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [period, setPeriod] = useState(null);
+  const [period, setPeriodNow] = useState(null);
   const [customDay, setCustomDay] = useState('');
+  const [customMonth, setCustomMonth] = useState('');
+  // Large periods (e.g. "All time") render many rows; as a transition the table shows its loader meanwhile.
+  const [isSwitching, startTransition] = useTransition();
+  const setPeriod = (value) => startTransition(() => setPeriodNow(value));
   const [editing, setEditing] = useState(null);
   const openEdit = setEditing;
 
@@ -50,14 +55,16 @@ export default function PaymentsPage() {
   // (not just the loaded page), searched client-side; otherwise it's the server page as before.
   const sourceRows = useMemo(() => {
     if (!period) return items;
-    const range = periodRange(period, customDay);
+    const range = periodRange(period, customDay, customMonth);
+    // A custom card with no day/month picked yet matches nothing, as its card total shows.
+    if (period !== 'all' && !range) return [];
     const term = search.trim().toLowerCase();
     return paid.filter(
       (row) =>
         inRange(paidAt(row), range) &&
         (!term || [row.name, row.email, row.mobile, row.transRef, row.user_id].some((v) => v != null && String(v).toLowerCase().includes(term))),
     );
-  }, [period, customDay, paid, items, search]);
+  }, [period, customDay, customMonth, paid, items, search]);
 
   const filteredRows = useMemo(() => {
     return sourceRows
@@ -67,7 +74,7 @@ export default function PaymentsPage() {
         if (dateTo && (!row.createdAt || new Date(row.createdAt) > new Date(`${dateTo}T23:59:59`))) return false;
         return true;
       })
-      .sort((a, b) => (b.status === 1 ? 1 : 0) - (a.status === 1 ? 1 : 0));
+      .sort(byNewest);
   }, [sourceRows, statusFilter, dateFrom, dateTo]);
 
   const hasActiveFilters = statusFilter !== 'all' || dateFrom || dateTo || period;
@@ -145,11 +152,9 @@ export default function PaymentsPage() {
       header: '',
       render: (row) => (
         <div className="flex justify-end gap-2">
+          <InvoiceButton payment={row} />
           <Button variant="secondary" size="sm" onClick={() => openEdit(row)} title="Edit expiry / status">
             <Pencil className="h-3.5 w-3.5" /> Edit
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => dispatch(manualVerifyPayment(row.user_id))}>
-            <BadgeCheck className="h-3.5 w-3.5" /> Verify
           </Button>
         </div>
       ),
@@ -168,6 +173,8 @@ export default function PaymentsPage() {
         onSelect={setPeriod}
         customDay={customDay}
         onCustomDayChange={setCustomDay}
+        customMonth={customMonth}
+        onCustomMonthChange={setCustomMonth}
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -227,7 +234,7 @@ export default function PaymentsPage() {
       <Table
         columns={columns}
         rows={filteredRows}
-        loading={period ? allStatus === 'loading' && all.length === 0 : status === 'loading'}
+        loading={isSwitching || (period ? allStatus === 'loading' && all.length === 0 : status === 'loading')}
         rowKey="_id"
         emptyMessage={period ? 'No payments in this period' : undefined}
       />

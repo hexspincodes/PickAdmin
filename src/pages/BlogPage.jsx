@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus, Pencil, Trash2, MessageSquare, Newspaper, CalendarDays, Heart } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Plus, MessageSquare, Newspaper, CalendarDays, Heart, Search, X } from 'lucide-react';
 import StatCards from '../components/common/StatCards';
-import { fetchAdminBlogs, createBlog, editBlog, deleteBlog, deleteBlogComment } from '../features/blog/blogSlice';
-import { generateSlugFromTitle } from '../features/blog/blogAPI';
+import BlogReaderModal from '../components/blog/BlogReaderModal';
+import { fetchAdminBlogs, createBlog, editBlog, deleteBlog } from '../features/blog/blogSlice';
+import { generateSlugFromTitle, getBlogBySlug } from '../features/blog/blogAPI';
 import PageHeader from '../components/common/PageHeader';
 import Table from '../components/common/Table';
 import Button from '../components/common/Button';
+import IconActionButton from '../components/common/IconActionButton';
 import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { Field, TextInput, TextArea, FileInput } from '../components/common/FormField';
-import { formatDate, formatDateTime } from '../utils/formatDate';
+import RichTextEditor from '../components/common/RichTextEditor';
+import { formatDate } from '../utils/formatDate';
+import { mediaUrl } from '../utils/mediaUrl';
 
 const emptyForm = {
   title: '',
@@ -22,8 +27,68 @@ const emptyForm = {
   meta_keywords: '',
   og_title: '',
   og_description: '',
+  canonical_url: '',
   thumbnail: null,
 };
+
+// Only the editable fields — the full record also carries comments/likes/_id/timestamps,
+// which must not be posted back.
+const toForm = (blog) =>
+  Object.fromEntries(Object.keys(emptyForm).map((key) => [key, key === 'thumbnail' ? null : blog[key] ?? '']));
+
+const blogUrl = (slug) => `https://www.pickmymaid.com/blog/${slug || 'your-post-slug'}`;
+
+// meta_keywords is stored as one comma-separated string.
+const splitKeywords = (value) =>
+  [...new Set((value || '').split(',').map((k) => k.trim()).filter(Boolean))];
+
+function CharCount({ value, limit }) {
+  const length = (value || '').length;
+  return (
+    <span className={length > limit ? 'text-red-500' : undefined}>
+      {length}/{limit} characters{length > limit ? ' — may be cut off in search results' : ''}
+    </span>
+  );
+}
+
+function KeywordInput({ value, onChange }) {
+  const [draft, setDraft] = useState('');
+  const keywords = splitKeywords(value);
+  const commit = () => {
+    if (!draft.trim()) return;
+    onChange(splitKeywords(`${value},${draft}`).join(', '));
+    setDraft('');
+  };
+  const remove = (keyword) => onChange(keywords.filter((k) => k !== keyword).join(', '));
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-gray-300 px-2 py-1.5 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500">
+      {keywords.map((k) => (
+        <span key={k} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 pl-2.5 pr-1 text-xs font-medium text-brand-700">
+          {k}
+          <button type="button" onClick={() => remove(k)} className="rounded-full p-0.5 hover:bg-brand-100" aria-label={`Remove ${k}`}>
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            commit();
+          } else if (e.key === 'Backspace' && !draft && keywords.length) {
+            remove(keywords[keywords.length - 1]);
+          }
+        }}
+        onBlur={commit}
+        placeholder={keywords.length ? '' : 'e.g. maid agency abu dhabi'}
+        className="min-w-32 flex-1 border-0 bg-transparent py-0.5 text-sm outline-none focus:ring-0"
+      />
+    </div>
+  );
+}
 
 // filter: what the table shows when the card is selected ('' = every post).
 const STAT_CARDS = [
@@ -65,12 +130,29 @@ export default function BlogPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingPost, setLoadingPost] = useState(false);
+  const editingSlugRef = useRef(null);
+  editingSlugRef.current = formOpen ? editing?.slug ?? null : null;
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [commentsTarget, setCommentsTarget] = useState(null);
+  // { blog, comments }: the post open in the reader, and whether to jump to its comments.
+  const [reading, setReading] = useState(null);
 
   useEffect(() => {
     dispatch(fetchAdminBlogs());
   }, [dispatch]);
+
+  // Object URL for the newly picked thumbnail, revoked when it changes or the form closes.
+  const [thumbPreview, setThumbPreview] = useState('');
+  useEffect(() => {
+    if (!form.thumbnail) {
+      setThumbPreview('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(form.thumbnail);
+    setThumbPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [form.thumbnail]);
+  const thumbSrc = thumbPreview || (editing?.thumbnail ? mediaUrl(editing.thumbnail) : '');
 
   const openCreate = () => {
     setEditing(null);
@@ -78,10 +160,25 @@ export default function BlogPage() {
     setFormOpen(true);
   };
 
-  const openEdit = (blog) => {
+  // The admin list may not carry every field, so load the full post before editing.
+  const openEdit = async (blog) => {
     setEditing(blog);
-    setForm({ ...emptyForm, ...blog, thumbnail: null });
+    setForm(toForm(blog));
     setFormOpen(true);
+    setLoadingPost(true);
+    try {
+      const res = await getBlogBySlug(blog.slug);
+      const full = res.data?.blog;
+      // Ignore the response if the admin already switched to another post.
+      if (full && editingSlugRef.current === blog.slug) {
+        setEditing({ ...blog, ...full });
+        setForm(toForm({ ...blog, ...full }));
+      }
+    } catch (err) {
+      toast.error(`Couldn't load the full post: ${err.message}`);
+    } finally {
+      if (editingSlugRef.current === blog.slug) setLoadingPost(false);
+    }
   };
 
   const handleTitleBlur = async () => {
@@ -96,6 +193,11 @@ export default function BlogPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // The rich text editor isn't a native input, so `required` can't enforce it.
+    if (!form.content) {
+      toast.error('Content is required');
+      return;
+    }
     setSubmitting(true);
     const fieldsKey = editing ? 'thumbnailFile' : 'thumbnail';
     const { thumbnail, ...rest } = form;
@@ -118,25 +220,59 @@ export default function BlogPage() {
   };
 
   const columns = [
-    { key: 'title', header: 'Title' },
-    { key: 'slug', header: 'Slug' },
-    { key: 'comments', header: 'Comments', render: (row) => row.comments?.length || 0 },
-    { key: 'likes', header: 'Likes', render: (row) => row.likes?.length || 0 },
+    {
+      key: 'thumbnail',
+      header: 'Image',
+      render: (row) =>
+        row.thumbnail ? (
+          <img src={mediaUrl(row.thumbnail)} alt="" className="h-16 w-24 rounded-md object-cover" />
+        ) : (
+          <div className="h-16 w-24 rounded-md bg-gray-100" />
+        ),
+    },
+    {
+      key: 'title',
+      header: 'Title',
+      render: (row) => (
+        <div className="max-w-md">
+          <p className="truncate font-medium text-gray-900">{row.title}</p>
+          <p className="truncate text-xs text-gray-500">{row.description}</p>
+        </div>
+      ),
+    },
     { key: 'createdAt', header: 'Created', render: (row) => formatDate(row.createdAt) },
+    { key: 'editedAt', header: 'Last Edited', render: (row) => formatDate(row.editedAt || row.updatedAt) },
     {
       key: 'actions',
       header: '',
       render: (row) => (
-        <div className="flex justify-end gap-1.5">
-          <Button variant="secondary" size="sm" title="Comments" onClick={() => setCommentsTarget(row)}>
-            <MessageSquare className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="secondary" size="sm" title="Edit" onClick={() => openEdit(row)}>
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="danger" size="sm" title="Delete" onClick={() => setDeleteTarget(row)}>
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {/* stopPropagation: the row itself opens the reader. */}
+          <IconActionButton
+            action="comments"
+            label={`Comments on ${row.title}`}
+            count={row.comments?.length}
+            onClick={(e) => {
+              e.stopPropagation();
+              setReading({ blog: row, comments: true });
+            }}
+          />
+          <IconActionButton
+            action="edit"
+            label={`Edit ${row.title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(row);
+            }}
+          />
+          <IconActionButton
+            action="delete"
+            label={`Delete ${row.title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteTarget(row);
+            }}
+          />
         </div>
       ),
     },
@@ -174,89 +310,151 @@ export default function BlogPage() {
         rows={rows}
         loading={status === 'loading' && items.length === 0}
         rowKey="_id"
+        onRowClick={(row) => setReading({ blog: row, comments: false })}
         emptyMessage={cardFilter ? 'No posts match this card' : 'No blog posts yet'}
       />
 
-      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? 'Edit Blog Post' : 'New Blog Post'} size="lg">
+      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? 'Edit Blog Post' : 'New Blog Post'} size="2xl" closeOnBackdrop={false}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Field label="Title" required>
-            <TextInput
-              required
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              onBlur={handleTitleBlur}
+          {loadingPost && (
+            <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">Loading the full post…</p>
+          )}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+            <div className="space-y-4">
+              <Field label="Title" required>
+                <TextInput
+                  required
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  onBlur={handleTitleBlur}
+                />
+              </Field>
+              <Field label="Slug" required hint="Auto-filled from title when left blank">
+                <TextInput required value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+              </Field>
+              <Field label="Description" required>
+                <TextArea rows={3} required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              </Field>
+            </div>
+            <Field label="Thumbnail" required={!editing} hint={editing ? 'Leave empty to keep the current thumbnail' : undefined}>
+              <div className="mb-2 flex aspect-video items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50">
+                {thumbSrc ? (
+                  <img src={thumbSrc} alt="Thumbnail preview" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs text-gray-400">No image selected</span>
+                )}
+              </div>
+              <FileInput
+                required={!editing}
+                accept="image/*"
+                onChange={(e) => setForm({ ...form, thumbnail: e.target.files[0] || null })}
+              />
+            </Field>
+          </div>
+          <Field label="Content" required>
+            <RichTextEditor
+              id="blog_content"
+              value={form.content}
+              onChange={(html) => setForm((f) => ({ ...f, content: html }))}
+              minHeight={360}
             />
           </Field>
-          <Field label="Slug" required hint="Auto-filled from title when left blank">
-            <TextInput required value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-          </Field>
-          <Field label="Description" required>
-            <TextArea rows={2} required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          </Field>
-          <Field label="Content" required hint="HTML or Markdown">
-            <TextArea rows={8} required value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
-          </Field>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Meta Title">
-              <TextInput value={form.meta_title} onChange={(e) => setForm({ ...form, meta_title: e.target.value })} />
-            </Field>
-            <Field label="Meta Keywords">
-              <TextInput value={form.meta_keywords} onChange={(e) => setForm({ ...form, meta_keywords: e.target.value })} />
-            </Field>
-          </div>
-          <Field label="Meta Description">
-            <TextArea rows={2} value={form.meta_description} onChange={(e) => setForm({ ...form, meta_description: e.target.value })} />
-          </Field>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="OG Title">
-              <TextInput value={form.og_title} onChange={(e) => setForm({ ...form, og_title: e.target.value })} />
-            </Field>
-            <Field label="OG Description">
-              <TextInput value={form.og_description} onChange={(e) => setForm({ ...form, og_description: e.target.value })} />
-            </Field>
-          </div>
-          <Field label="Thumbnail" required={!editing} hint={editing ? 'Leave empty to keep the current thumbnail' : undefined}>
-            <FileInput required={!editing} accept="image/*" onChange={(e) => setForm({ ...form, thumbnail: e.target.files[0] })} />
-          </Field>
+          <section className="rounded-xl border border-gray-200 p-4">
+            <div className="mb-4 flex items-center gap-2">
+              <Search className="h-4 w-4 text-brand-600" />
+              <h4 className="text-sm font-semibold text-gray-900">SEO</h4>
+              <span className="text-xs text-gray-400">Falls back to the title and description when left blank</span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_400px]">
+              <div className="space-y-4">
+                <Field label="Meta Title" hint={<CharCount value={form.meta_title || form.title} limit={60} />}>
+                  <TextInput
+                    value={form.meta_title}
+                    placeholder={form.title}
+                    onChange={(e) => setForm({ ...form, meta_title: e.target.value })}
+                  />
+                </Field>
+                <Field label="Meta Description" hint={<CharCount value={form.meta_description || form.description} limit={160} />}>
+                  <TextArea
+                    rows={3}
+                    value={form.meta_description}
+                    placeholder={form.description}
+                    onChange={(e) => setForm({ ...form, meta_description: e.target.value })}
+                  />
+                </Field>
+                {/* Not <Field>: its <label> wrapper would forward clicks to the first chip's remove button. */}
+                <div>
+                  <span className="mb-1 block text-sm font-medium text-gray-700">Meta Keywords</span>
+                  <KeywordInput value={form.meta_keywords} onChange={(v) => setForm((f) => ({ ...f, meta_keywords: v }))} />
+                  <span className="mt-1 block text-xs text-gray-400">Press Enter or comma to add a keyword</span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="OG Title">
+                    <TextInput value={form.og_title} onChange={(e) => setForm({ ...form, og_title: e.target.value })} />
+                  </Field>
+                  <Field label="OG Description">
+                    <TextInput value={form.og_description} onChange={(e) => setForm({ ...form, og_description: e.target.value })} />
+                  </Field>
+                </div>
+                <Field label="Canonical URL">
+                  <TextInput
+                    type="url"
+                    value={form.canonical_url}
+                    placeholder={blogUrl(form.slug)}
+                    onChange={(e) => setForm({ ...form, canonical_url: e.target.value })}
+                  />
+                </Field>
+              </div>
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-gray-700">Search preview</p>
+                <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                  <p className="truncate text-xs text-gray-600">{form.canonical_url || blogUrl(form.slug)}</p>
+                  <p className="mt-1 line-clamp-2 text-lg leading-snug text-[#1a0dab]">
+                    {form.meta_title || form.title || 'Blog post title'}
+                  </p>
+                  <p className="mt-1 line-clamp-3 text-sm text-gray-600">
+                    {form.meta_description || form.description || 'The meta description shows here in search results.'}
+                  </p>
+                </div>
+                {splitKeywords(form.meta_keywords).length > 0 && (
+                  <div className="mt-4">
+                    <p className="mb-1.5 text-sm font-medium text-gray-700">Keywords</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {splitKeywords(form.meta_keywords).map((k) => (
+                        <span key={k} className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
+                          {k}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" loading={submitting}>
+            <Button type="submit" loading={submitting} disabled={loadingPost}>
               {editing ? 'Save Changes' : 'Publish'}
             </Button>
           </div>
         </form>
       </Modal>
 
-      <Modal open={!!commentsTarget} onClose={() => setCommentsTarget(null)} title={`Comments — ${commentsTarget?.title || ''}`}>
-        {(commentsTarget?.comments?.length || 0) === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-400">No comments yet</p>
-        ) : (
-          <ul className="space-y-3">
-            {commentsTarget.comments.map((c) => (
-              <li key={c._id} className="flex items-start justify-between gap-3 rounded-lg border border-gray-100 bg-white p-3 text-sm">
-                <div>
-                  <p className="text-gray-700">{c.comment}</p>
-                  <p className="mt-1 text-xs text-gray-400">
-                    {c.user_id} · {c.createdAt ? formatDateTime(c.createdAt) : ''}
-                  </p>
-                </div>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={async () => {
-                    await dispatch(deleteBlogComment({ slug: commentsTarget.slug, comment_id: c._id }));
-                    setCommentsTarget({ ...commentsTarget, comments: commentsTarget.comments.filter((x) => x._id !== c._id) });
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Modal>
+      <BlogReaderModal
+        blog={reading?.blog}
+        scrollToComments={reading?.comments}
+        onClose={() => setReading(null)}
+        onEdit={(blog) => {
+          setReading(null);
+          openEdit(blog);
+        }}
+        onDelete={(blog) => {
+          setReading(null);
+          setDeleteTarget(blog);
+        }}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}

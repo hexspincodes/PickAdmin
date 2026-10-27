@@ -12,7 +12,6 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const MaidsListPage = lazy(() => import('./pages/maids/MaidsListPage'));
 const MaidFormPage = lazy(() => import('./pages/maids/MaidFormPage'));
 const MaidDetailPage = lazy(() => import('./pages/maids/MaidDetailPage'));
-const JobsPage = lazy(() => import('./pages/JobsPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const SkillsPage = lazy(() => import('./pages/SkillsPage'));
@@ -69,15 +68,6 @@ export default function App() {
               element={
                 <RoleGuard allowed={[ROLES.SA, ROLES.A]}>
                   <MaidFormPage />
-                </RoleGuard>
-              }
-            />
-
-            <Route
-              path="jobs"
-              element={
-                <RoleGuard allowed={[ROLES.SA, ROLES.A]}>
-                  <JobsPage />
                 </RoleGuard>
               }
             />

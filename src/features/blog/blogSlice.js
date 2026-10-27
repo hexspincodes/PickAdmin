@@ -76,6 +76,11 @@ const blogSlice = createSlice({
       .addCase(fetchAdminBlogs.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      // Keep the table's comment counts in step without refetching every post.
+      .addCase(deleteBlogComment.fulfilled, (state, action) => {
+        const blog = state.items.find((b) => b.slug === action.payload.slug);
+        if (blog?.comments) blog.comments = blog.comments.filter((c) => c._id !== action.payload.comment_id);
       });
   },
 });

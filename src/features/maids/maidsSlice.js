@@ -2,18 +2,36 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import toast from 'react-hot-toast';
 import * as maidsAPI from './maidsAPI';
 
-const CLIENT_STATUS_FILTERS = { pending: 0, disabled: 3 };
+// GET /job/ returns every pending (status 0) maid, unpaginated and unsearched.
+const loadPendingMaids = async () => {
+  const res = await maidsAPI.getPendingMaids();
+  return res.data?.jobApplication || [];
+};
+
+const SEARCH_FIELDS = ['name', 'email', 'ref_number', 'mobile', 'uae_no'];
+const matchesSearch = (maid, search) => {
+  const term = search.trim().toLowerCase();
+  return !term || SEARCH_FIELDS.some((k) => maid[k] != null && String(maid[k]).toLowerCase().includes(term));
+};
 
 export const fetchMaids = createAsyncThunk(
   'maids/fetch',
   async ({ page = 1, limit = 100, search = '', filter = '' } = {}, { rejectWithValue }) => {
     try {
-      // No backend filter for pending/disabled: fetch 'unapproved' (only status 0 and 3), filter and page here.
-      if (filter in CLIENT_STATUS_FILTERS) {
-        const res = await maidsAPI.getAllMaids(1, 10000, search, 'unapproved');
-        const matching = (res.data?.jobApplication || []).filter((m) => m.status === CLIENT_STATUS_FILTERS[filter]);
+      // No backend filter for pending/disabled. /job/all caps limit at 100, so the pending list comes
+      // from /job/ (searched and paged here).
+      if (filter === 'pending') {
+        const matching = (await loadPendingMaids()).filter((m) => matchesSearch(m, search));
         const list = matching.slice((page - 1) * limit, page * limit);
         return { list, count: matching.length, page, limit, search, filter };
+      }
+      // 'unapproved' is disabled (3) maids followed by pending (0) ones, so its pages are the disabled
+      // list, with pending rows dropped from the last page and from the count.
+      if (filter === 'disabled') {
+        const [res, pending] = await Promise.all([maidsAPI.getAllMaids(page, limit, search, 'unapproved'), loadPendingMaids()]);
+        const list = (res.data?.jobApplication || []).filter((m) => m.status === 3);
+        const pendingCount = pending.filter((m) => matchesSearch(m, search)).length;
+        return { list, count: Math.max((res.data?.count || 0) - pendingCount, 0), page, limit, search, filter };
       }
       const res = await maidsAPI.getAllMaids(page, limit, search, filter);
       return { list: res.data?.jobApplication || [], count: res.data?.count || 0, page, limit, search, filter };
@@ -24,23 +42,25 @@ export const fetchMaids = createAsyncThunk(
 );
 
 // The counts endpoint has no status breakdown, so derive it from the list endpoint's `count`.
-// There is no 'disabled' filter: 'unapproved' holds only pending (0) and disabled (3) maids, so split that list.
+// There is no 'disabled' filter: 'unapproved' holds only pending (0) and disabled (3) maids, so
+// disabled is the unapproved count minus the pending list.
 export const fetchMaidStatusCounts = createAsyncThunk('maids/fetchStatusCounts', async (_, { rejectWithValue }) => {
   try {
-    const [all, approved, hired, unapproved] = await Promise.all([
+    const [all, approved, hired, unapproved, pendingList] = await Promise.all([
       maidsAPI.getAllMaids(1, 1, '', ''),
       maidsAPI.getAllMaids(1, 1, '', 'approved'),
       maidsAPI.getAllMaids(1, 1, '', 'hired'),
-      maidsAPI.getAllMaids(1, 10000, '', 'unapproved'),
+      maidsAPI.getAllMaids(1, 1, '', 'unapproved'),
+      loadPendingMaids(),
     ]);
     const total = all.data?.count || 0;
     const hiredCount = hired.data?.count || 0;
-    const disabled = (unapproved.data?.jobApplication || []).filter((m) => m.status === 3).length;
+    const pending = pendingList.length;
     return {
       total,
       approved: approved.data?.count || 0,
-      pending: (unapproved.data?.count || 0) - disabled,
-      disabled,
+      pending,
+      disabled: Math.max((unapproved.data?.count || 0) - pending, 0),
       hired: hiredCount,
       available: total - hiredCount,
     };
@@ -51,8 +71,7 @@ export const fetchMaidStatusCounts = createAsyncThunk('maids/fetchStatusCounts',
 
 export const fetchPendingMaids = createAsyncThunk('maids/fetchPending', async (_, { rejectWithValue }) => {
   try {
-    const res = await maidsAPI.getPendingMaids();
-    return res.data?.jobApplication || [];
+    return await loadPendingMaids();
   } catch (err) {
     return rejectWithValue(err.message);
   }

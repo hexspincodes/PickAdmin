@@ -4,7 +4,6 @@ import {
   UserCog,
   Wallet,
   ClipboardList,
-  Briefcase,
   Newspaper,
   Mail,
   BarChart3,
@@ -16,7 +15,6 @@ import { ROLES } from '../utils/roles';
 export const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.SA, ROLES.A, ROLES.MARKETING], group: 'main' },
   { to: '/maids', label: 'Maids Management', icon: ClipboardList, roles: [ROLES.SA, ROLES.A], group: 'main' },
-  { to: '/jobs', label: 'Job Listings', icon: Briefcase, roles: [ROLES.SA, ROLES.A], group: 'main' },
   { to: '/blog', label: 'Blog Management', icon: Newspaper, roles: [ROLES.SA, ROLES.MARKETING], group: 'main' },
   { to: '/contact', label: 'Contact Messages', icon: Mail, roles: [ROLES.SA, ROLES.A], group: 'main' },
   { to: '/skills', label: 'Skills Management', icon: Sparkles, roles: [ROLES.SA, ROLES.A], group: 'main' },

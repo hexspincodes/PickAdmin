@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Ban, KeyRound, ShieldCheck, SquarePen, Trash2 } from 'lucide-react';
+import { Ban, Eye, EyeOff, KeyRound, MessageSquare, ShieldCheck, SquarePen, Trash2 } from 'lucide-react';
 
 // Soft tinted tile at rest; fills with the solid colour on hover. Icon motion respects reduced-motion.
 const TONES = {
@@ -14,6 +14,24 @@ const TONES = {
     label: 'Delete',
     tile: 'bg-red-50 text-red-600 ring-red-200/70 hover:bg-red-500 hover:text-white hover:ring-red-500 hover:shadow-red-500/30 focus-visible:outline-red-500',
     motion: 'motion-safe:group-hover:animate-wiggle',
+  },
+  comments: {
+    icon: MessageSquare,
+    label: 'Comments',
+    tile: 'bg-violet-50 text-violet-600 ring-violet-200/70 hover:bg-violet-500 hover:text-white hover:ring-violet-500 hover:shadow-violet-500/30 focus-visible:outline-violet-500',
+    motion: 'motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:scale-110',
+  },
+  hide: {
+    icon: EyeOff,
+    label: 'Hide',
+    tile: 'bg-amber-50 text-amber-600 ring-amber-200/70 hover:bg-amber-500 hover:text-white hover:ring-amber-500 hover:shadow-amber-500/30 focus-visible:outline-amber-500',
+    motion: 'motion-safe:group-hover:scale-110',
+  },
+  show: {
+    icon: Eye,
+    label: 'Show',
+    tile: 'bg-green-50 text-green-600 ring-green-200/70 hover:bg-green-500 hover:text-white hover:ring-green-500 hover:shadow-green-500/30 focus-visible:outline-green-500',
+    motion: 'motion-safe:group-hover:scale-110',
   },
   reset: {
     icon: KeyRound,
@@ -35,7 +53,8 @@ const TONES = {
   },
 };
 
-export default function IconActionButton({ action, label, onClick, className }) {
+// `count` adds a small pill after the text (hidden when 0/undefined).
+export default function IconActionButton({ action, label, onClick, className, count }) {
   const { icon: Icon, label: defaultLabel, tile, motion } = TONES[action];
   const text = label || defaultLabel;
   return (
@@ -54,6 +73,9 @@ export default function IconActionButton({ action, label, onClick, className }) 
     >
       <Icon className={clsx('h-4 w-4 transition-transform duration-200', motion)} strokeWidth={2} />
       {defaultLabel}
+      {count > 0 && (
+        <span className="min-w-5 rounded-full bg-current/15 px-1.5 text-center text-xs leading-5 tabular-nums">{count}</span>
+      )}
     </button>
   );
 }

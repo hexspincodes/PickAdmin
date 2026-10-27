@@ -1,7 +1,13 @@
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
-export default function Modal({ open, onClose, title, children, size = 'md' }) {
+// closeOnBackdrop: clicking the dimmed area outside the panel closes it. Turn off for long
+// forms where a stray click would throw away unsaved input.
+export default function Modal({ open, onClose, title, children, size = 'md', closeOnBackdrop = true }) {
+  // Only a click that both starts and ends on the backdrop closes — dragging a text
+  // selection out of the panel must not.
+  const pressedOnBackdrop = useRef(false);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -14,7 +20,16 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
   const widths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', '2xl': 'max-w-6xl' };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8 sm:items-center">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8 sm:items-center"
+      onMouseDown={(e) => {
+        pressedOnBackdrop.current = e.target === e.currentTarget;
+      }}
+      onMouseUp={(e) => {
+        if (closeOnBackdrop && pressedOnBackdrop.current && e.target === e.currentTarget) onClose();
+        pressedOnBackdrop.current = false;
+      }}
+    >
       <div className={`w-full ${widths[size]} rounded-2xl bg-white shadow-xl`}>
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <h3 className="text-base font-semibold text-gray-900">{title}</h3>
