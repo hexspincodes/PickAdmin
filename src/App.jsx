@@ -93,7 +93,7 @@ export default function App() {
             <Route
               path="skills"
               element={
-                <RoleGuard allowed={[ROLES.SA, ROLES.A]}>
+                <RoleGuard allowed={[ROLES.SA]}>
                   <SkillsPage />
                 </RoleGuard>
               }

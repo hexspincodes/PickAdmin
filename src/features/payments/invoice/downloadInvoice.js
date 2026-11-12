@@ -23,11 +23,14 @@ const ddmmyyyy = (date) => {
 // pdfmake + its fonts are ~1MB, so they load on the first download only.
 let pdfMakePromise;
 const loadPdfMake = () => {
-  pdfMakePromise ??= Promise.all([import('pdfmake/build/pdfmake'), import('pdfmake/build/vfs_fonts')]).then(
-    ([pdfMakeModule, fontsModule]) => {
+  pdfMakePromise ??= Promise.all([import('pdfmake/build/pdfmake'), import('pdfmake/build/vfs_fonts.js?raw')]).then(
+    ([pdfMakeModule, fontsSource]) => {
       const pdfMake = pdfMakeModule.default ?? pdfMakeModule;
-      const fonts = fontsModule.default ?? fontsModule;
-      pdfMake.vfs = fonts.pdfMake?.vfs ?? fonts.vfs ?? fonts;
+      // pdfmake 0.2.9's vfs_fonts.js is a classic script that assigns `this.pdfMake.vfs`. Imported
+      // as an ES module, `this` is undefined and it throws, so run its source with a holder as `this`.
+      const holder = {};
+      new Function(fontsSource.default).call(holder);
+      pdfMake.vfs = holder.pdfMake.vfs;
       return pdfMake;
     },
   );

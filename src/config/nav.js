@@ -17,7 +17,7 @@ export const NAV_ITEMS = [
   { to: '/maids', label: 'Maids Management', icon: ClipboardList, roles: [ROLES.SA, ROLES.A], group: 'main' },
   { to: '/blog', label: 'Blog Management', icon: Newspaper, roles: [ROLES.SA, ROLES.MARKETING], group: 'main' },
   { to: '/contact', label: 'Contact Messages', icon: Mail, roles: [ROLES.SA, ROLES.A], group: 'main' },
-  { to: '/skills', label: 'Skills Management', icon: Sparkles, roles: [ROLES.SA, ROLES.A], group: 'main' },
+  { to: '/skills', label: 'Skills Management', icon: Sparkles, roles: [ROLES.SA], group: 'main' },
   { to: '/customers', label: 'Customers Management', icon: UsersRound, roles: [ROLES.SA], group: 'other' },
   { to: '/payments', label: 'Payment Management', icon: Wallet, roles: [ROLES.SA], group: 'other' },
   { to: '/coupons', label: 'Coupon Management', icon: TicketPercent, roles: [ROLES.SA], group: 'other' },
