@@ -76,6 +76,24 @@ export const toggleCustomerBlock = createAsyncThunk(
   },
 );
 
+export const deleteCustomer = createAsyncThunk(
+  'customers/delete',
+  async (user_id, { dispatch, getState, rejectWithValue }) => {
+    try {
+      const res = await customersAPI.deleteCustomer(user_id);
+      toast.success(res.message || 'Customer deleted');
+      const { page, search } = getState().customers;
+      dispatch(fetchCustomers({ page, search }));
+      dispatch(fetchAllCustomers());
+      dispatch(fetchCustomersTotal());
+      return user_id;
+    } catch (err) {
+      toast.error(err.message);
+      return rejectWithValue(err.message);
+    }
+  },
+);
+
 const customersSlice = createSlice({
   name: 'customers',
   initialState: {

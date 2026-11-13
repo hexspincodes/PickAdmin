@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import toast from 'react-hot-toast';
 import * as contactAPI from './contactAPI';
 
 export const fetchContacts = createAsyncThunk('contact/fetch', async (_, { rejectWithValue }) => {
@@ -6,6 +7,17 @@ export const fetchContacts = createAsyncThunk('contact/fetch', async (_, { rejec
     const res = await contactAPI.getContacts();
     return res.data?.contacts || [];
   } catch (err) {
+    return rejectWithValue(err.message);
+  }
+});
+
+export const deleteContact = createAsyncThunk('contact/delete', async (id, { rejectWithValue }) => {
+  try {
+    const res = await contactAPI.deleteContact(id);
+    toast.success(res.message || 'Message deleted');
+    return id;
+  } catch (err) {
+    toast.error(err.message);
     return rejectWithValue(err.message);
   }
 });
@@ -56,6 +68,9 @@ const contactSlice = createSlice({
       .addCase(fetchContacts.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      .addCase(deleteContact.fulfilled, (state, action) => {
+        state.items = state.items.filter((c) => c._id !== action.payload);
       });
   },
 });

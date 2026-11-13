@@ -11,5 +11,9 @@ export const getCustomers = (page = 1, search = '') =>
 export const updateCustomerPassword = (user_id, password) =>
   unwrap(api1.put('/api/v1/admin/customer-password', { user_id, password }));
 
+// DELETE /api/v1/admin/customer/:user_id — Backend1, JWT, SA only. Refused (409) for customers
+// who have ever paid; their payments and invoices must be kept.
+export const deleteCustomer = (user_id) => unwrap(api1.delete(`/api/v1/admin/customer/${user_id}`));
+
 // GET /api/v1/admin/block-user/:user_id — Backend1, JWT, SA only (state-changing GET, by design)
 export const toggleUserBlock = (user_id) => unwrap(api1.get(`/api/v1/admin/block-user/${user_id}`));

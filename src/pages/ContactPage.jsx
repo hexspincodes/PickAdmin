@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
+  deleteContact,
   fetchContacts,
   isNewContact,
   readContactsLastSeen,
@@ -10,6 +11,8 @@ import {
 import PageHeader from '../components/common/PageHeader';
 import Table from '../components/common/Table';
 import Badge from '../components/common/Badge';
+import IconActionButton from '../components/common/IconActionButton';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import { formatDateTime } from '../utils/formatDate';
 
 export default function ContactPage() {
@@ -18,6 +21,8 @@ export default function ContactPage() {
   const userId = useSelector((state) => state.auth.user?.user_id);
   // Captured on arrival so the rows that were new stay marked while the admin reads them.
   const [seenBefore] = useState(() => readContactsLastSeen(userId));
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     dispatch(fetchContacts());
@@ -45,12 +50,44 @@ export default function ContactPage() {
     { key: 'mobile', header: 'Mobile' },
     { key: 'message', header: 'Message', render: (row) => <span className="line-clamp-2 max-w-md">{row.message}</span> },
     { key: 'createdAt', header: 'Received', render: (row) => formatDateTime(row.createdAt) },
+    {
+      key: 'actions',
+      header: '',
+      render: (row) => (
+        <div className="flex justify-end">
+          <IconActionButton
+            action="delete"
+            label={`Delete message from ${row.name || 'visitor'}`}
+            onClick={() => setDeleteTarget(row)}
+          />
+        </div>
+      ),
+    },
   ];
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    await dispatch(deleteContact(deleteTarget._id));
+    setDeleting(false);
+    setDeleteTarget(null);
+  };
 
   return (
     <div>
       <PageHeader title="Contact Messages" description="Enquiries submitted through the public contact form" />
       <Table columns={columns} rows={items} loading={status === 'loading' && items.length === 0} rowKey="_id" />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Delete message"
+        message={`Permanently delete the message from ${deleteTarget?.name || 'this visitor'}${
+          deleteTarget?.email ? ` (${deleteTarget.email})` : ''
+        }? This can't be undone.`}
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

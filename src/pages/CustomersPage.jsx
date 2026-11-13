@@ -6,7 +6,9 @@ import {
   fetchAllCustomers,
   resetCustomerPassword,
   toggleCustomerBlock,
+  deleteCustomer,
 } from '../features/customers/customersSlice';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import StatCards from '../components/common/StatCards';
 import { formatDateTime } from '../utils/formatDate';
 import { CUSTOMERS_PAGE_SIZE } from '../features/customers/customersAPI';
@@ -36,6 +38,8 @@ export default function CustomersPage() {
   const totalPages = Math.max(1, Math.ceil(count / CUSTOMERS_PAGE_SIZE));
   const [searchInput, setSearchInput] = useState(search);
   const [resetTarget, setResetTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [historyTarget, setHistoryTarget] = useState(null);
   const [generatedPassword, setGeneratedPassword] = useState('');
 
@@ -73,6 +77,13 @@ export default function CustomersPage() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    await dispatch(deleteCustomer(deleteTarget.user_id));
+    setDeleting(false);
+    setDeleteTarget(null);
+  };
 
   const handleResetPassword = async () => {
     const result = await dispatch(resetCustomerPassword({ user_id: resetTarget.user_id, password: '' }));
@@ -125,6 +136,7 @@ export default function CustomersPage() {
             label={`${row.is_blocked ? 'Unblock' : 'Block'} ${row.email}`}
             onClick={() => dispatch(toggleCustomerBlock(row.user_id))}
           />
+          <IconActionButton action="delete" label={`Delete ${row.email}`} onClick={() => setDeleteTarget(row)} />
         </div>
       ),
     },
@@ -243,6 +255,16 @@ export default function CustomersPage() {
       </Modal>
 
       <CustomerPaymentsModal customer={historyTarget} onClose={() => setHistoryTarget(null)} />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Delete customer"
+        message={`Permanently delete ${deleteTarget?.email || 'this customer'} and their saved preferences, wishlist and blog comments? This can't be undone. Customers who have paid can't be deleted — block them instead.`}
+        confirmLabel="Delete"
+      />
     </div>
   );
 }
