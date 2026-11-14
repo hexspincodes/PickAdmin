@@ -92,11 +92,14 @@ export const SKILLS = [
   "Cleaning/Housekeeping",
 ];
 
-// Stored in the `option` list; pick both for a maid who does either. Older profiles'
-// "Live In And Live Out" is loaded as both (see toList in MaidFormPage).
+// Stored in the `option` list; pick every arrangement the maid accepts. Older profiles'
+// "Live In And Live Out" is loaded as both (see toList in MaidFormPage). "Part Time" is
+// spelled to match the website's "Part Time" quick search.
 export const LIVE_OPTIONS = [
   { value: "Live In", label: "Live-In" },
   { value: "Live Out", label: "Live-Out" },
+  { value: "Part Time", label: "Part-Time" },
+  { value: "Full Time", label: "Full-Time" },
 ];
 
 export const LANGUAGES = [

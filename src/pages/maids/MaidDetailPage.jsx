@@ -389,7 +389,7 @@ export default function MaidDetailPage() {
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <Field label="Services">{list(maid.service)}</Field>
               <Field label="Locations">{list(maid.location)}</Field>
-              <Field label="Live in / out">{list(maid.option)}</Field>
+              <Field label="Work options">{list(maid.option)}</Field>
               <Field label="Salary">{salaryLabel(maid)}</Field>
               <Field label="Day off">{maid.day_of}</Field>
               <Field label="Available from">{maid.available_from}</Field>
