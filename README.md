@@ -83,3 +83,11 @@ each call site:
   string, not the request body.
 - `GET /api/v1/job/counts` has a backend bug that puts its payload under
   `message` instead of `data` — the frontend reads either.
+
+## Deploying
+
+`main` on `pickmymaiduae/Pickmymaid_AdminDashboard` deploys to Vercel
+automatically. The Vercel project is on the Hobby plan, which only deploys
+commits from a private repo when the **commit author is the account owner** —
+so commit as `pickmymaiduae <pickmymaiduae@gmail.com>` (this repo's local git
+config) or the deployment shows "Deployment was blocked".
