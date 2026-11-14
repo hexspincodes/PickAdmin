@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { getToken, clearSession } from '../utils/tokenStorage';
 
-const BACKEND1_URL = import.meta.env.VITE_BACKEND1_URL || 'https://api.backendpickmymaid.site';
-const BACKEND2_URL = import.meta.env.VITE_BACKEND2_URL || 'https://api.backendpickmymaid.site';
+const BACKEND1_URL = import.meta.env.VITE_BACKEND1_URL || 'https://api.pickmymaid.com';
+const BACKEND2_URL = import.meta.env.VITE_BACKEND2_URL || 'https://api.pickmymaid.com';
 
 /**
  * Backend1 — admin, maids/jobs, blog, contact, analytics.

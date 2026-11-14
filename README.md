@@ -19,9 +19,9 @@ machine).
 
 ## Backend split
 
-- **Backend1** (`VITE_BACKEND1_URL`, default `https://api.backendpickmymaid.site`) —
+- **Backend1** (`VITE_BACKEND1_URL`, default `https://api.pickmymaid.com`) —
   admin, maids/jobs, blog, contact, analytics.
-- **Backend2** (`VITE_BACKEND2_URL`, default `https://api.backendpickmymaid.site`) —
+- **Backend2** (`VITE_BACKEND2_URL`, default `https://api.pickmymaid.com`) —
   auth, payments.
 
 Both default to the same production origin — this is the domain in
@@ -30,8 +30,8 @@ what's actually live in production (DNS-verified; `pickmymaid.site` /
 `api.pickmymaid.site` do **not** resolve, don't use those). Both
 backends sit behind that one host (nginx/k8s ingress routes by path
 prefix) and every request path already starts with `/api/v1` or
-`/api/v2` — e.g. `https://api.backendpickmymaid.site` + `/api/v1/admin/team`
-resolves to `https://api.backendpickmymaid.site/api/v1/admin/team`. For
+`/api/v2` — e.g. `https://api.pickmymaid.com` + `/api/v1/admin/team`
+resolves to `https://api.pickmymaid.com/api/v1/admin/team`. For
 local dev against separately-running backends, override both vars in
 `.env` to point at `http://localhost:8080` / `http://localhost:8081`
 instead.
