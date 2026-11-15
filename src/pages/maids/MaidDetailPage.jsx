@@ -11,6 +11,7 @@ import {
   Download,
   ExternalLink,
   Eye,
+  FileText,
   EyeOff,
   History,
   Loader2,
@@ -33,6 +34,7 @@ import {
   setMaidAssured,
   setMaidAvailability,
 } from '../../features/maids/maidsSlice';
+import { getMaidDocumentUrl } from '../../features/maids/maidsAPI';
 import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import Loader from '../../components/common/Loader';
@@ -104,6 +106,8 @@ function parseYoutube(link) {
   }
   return { url: url.href, id: /^[\w-]{11}$/.test(id || '') ? id : null };
 }
+
+const fileExt = (key) => key?.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() || '';
 
 function Section({ title, action, children }) {
   return (
@@ -201,6 +205,37 @@ export default function MaidDetailPage() {
     setDownloading(null);
   };
 
+  // Documents are private in storage, so each View/Save asks the backend for a short-lived link.
+  const handleDocumentView = async (doc) => {
+    // Open the tab now, inside the click — a tab opened after the request is caught by pop-up blockers.
+    const tab = window.open('', '_blank');
+    try {
+      const res = await getMaidDocumentUrl(maid._id, doc.image);
+      if (tab) tab.location.href = res.data.url;
+      else window.location.assign(res.data.url);
+    } catch (err) {
+      tab?.close();
+      toast.error(`Couldn't open the document: ${err.message}`);
+    }
+  };
+
+  const handleDocumentDownload = async (key, doc) => {
+    setDownloading(key);
+    try {
+      // The link is served as an attachment with the original file name, so following it saves the file.
+      const res = await getMaidDocumentUrl(maid._id, doc.image, true);
+      const a = document.createElement('a');
+      a.href = res.data.url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      toast.error(`Couldn't download the document: ${err.message}`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const handleDelete = async () => {
     const result = await dispatch(deleteMaid(id));
     setConfirmDelete(false);
@@ -226,6 +261,8 @@ export default function MaidDetailPage() {
   const notes = htmlToLines(maid.notes);
   const languages = (maid.language || []).filter((l) => l.name);
   const jobs = maid.employmentHistory || [];
+  // Uploaded documents ({ name, image: storage key }) from the website form or the admin panel.
+  const documents = (maid.word_file || []).filter((d) => d?.image);
   const youtube = maid.youtube_link ? parseYoutube(maid.youtube_link) : null;
 
   return (
@@ -368,6 +405,40 @@ export default function MaidDetailPage() {
               }
             >
               <video key={maid.video} src={mediaUrl(maid.video)} controls preload="metadata" className="max-h-96 w-full rounded-xl bg-black" />
+            </Section>
+          )}
+
+          {documents.length > 0 && (
+            <Section title={`Documents (${documents.length})`}>
+              <ul className="space-y-2">
+                {documents.map((doc, i) => {
+                  const name = doc.name || `Document ${i + 1}`;
+                  const key = `document-${i}`;
+                  return (
+                    <li key={doc._id || doc.image} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 p-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                        <FileText className="h-4.5 w-4.5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-gray-900" title={name}>
+                          {name}
+                        </span>
+                        <span className="text-xs uppercase text-gray-400">{fileExt(doc.image) || 'file'}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDocumentView(doc)}
+                        className="rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-white hover:text-brand-600"
+                      >
+                        View
+                      </button>
+                      <DownloadButton loading={downloading === key} onClick={() => handleDocumentDownload(key, doc)}>
+                        Save
+                      </DownloadButton>
+                    </li>
+                  );
+                })}
+              </ul>
             </Section>
           )}
         </div>

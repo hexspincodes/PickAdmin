@@ -15,6 +15,11 @@ export const getApprovedMaids = () => unwrap(api1.get('/api/v1/job/approved'));
 // POST /api/v1/job/id-dashboard — Backend1, JWT, SA/A, full profile for edit view
 export const getMaidDashboard = (id) => unwrap(api1.post('/api/v1/job/id-dashboard', { id }));
 
+// POST /api/v1/job/document-url — Backend1, JWT, SA/A. Documents are private in storage;
+// returns { url, expiresIn } — a signed link valid ~10 min. download: save instead of open.
+export const getMaidDocumentUrl = (id, key, download = false) =>
+  unwrap(api1.post('/api/v1/job/document-url', { id, key, download }));
+
 // POST /api/v1/job/ — Backend1, JWT, SA/A, multipart/form-data create
 export const createMaid = (fields) =>
   unwrap(api1.post('/api/v1/job/', toFormData(fields), { headers: { 'Content-Type': 'multipart/form-data' } }));
