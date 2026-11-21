@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Plus, Eye, EyeOff, Sparkles, ArrowUp, ArrowDown, ArrowDownAZ } from 'lucide-react';
 import IconActionButton from '../components/common/IconActionButton';
 import StatCards from '../components/common/StatCards';
-import { fetchSkills, createSkill, updateSkill, removeSkill } from '../features/skills/skillsSlice';
+import {
+  fetchSkills,
+  createSkill,
+  updateSkill,
+  removeSkill,
+  reorderSkills,
+  resetSkillOrder,
+} from '../features/skills/skillsSlice';
 import PageHeader from '../components/common/PageHeader';
 import Table from '../components/common/Table';
 import Button from '../components/common/Button';
@@ -38,6 +45,8 @@ export default function SkillsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     dispatch(fetchSkills());
@@ -87,7 +96,62 @@ export default function SkillsPage() {
     setDeleteTarget(null);
   };
 
+  // Reordering works on the full list; with a search or filter applied, "up" would be ambiguous.
+  const canReorder = !search.trim() && !statusFilter && items.length > 1;
+  const positionOf = useMemo(() => new Map(items.map((s, i) => [s._id, i])), [items]);
+
+  const move = (skill, step) => {
+    const from = positionOf.get(skill._id);
+    const to = from + step;
+    if (to < 0 || to >= items.length) return;
+    const ids = items.map((s) => s._id);
+    [ids[from], ids[to]] = [ids[to], ids[from]];
+    dispatch(reorderSkills(ids));
+  };
+
+  const handleResetOrder = async () => {
+    setResetting(true);
+    await dispatch(resetSkillOrder());
+    setResetting(false);
+    setConfirmReset(false);
+  };
+
+  const arrowClass =
+    'rounded-lg p-1 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400';
+
   const columns = [
+    {
+      key: 'order',
+      header: 'Order',
+      render: (row) => {
+        const index = positionOf.get(row._id);
+        return (
+          <div className="flex items-center gap-1">
+            <span className="w-6 text-right font-mono text-xs text-gray-500">{index + 1}</span>
+            <button
+              type="button"
+              onClick={() => move(row, -1)}
+              disabled={!canReorder || index === 0}
+              title="Move up"
+              aria-label={`Move ${row.name} up`}
+              className={arrowClass}
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => move(row, 1)}
+              disabled={!canReorder || index === items.length - 1}
+              title="Move down"
+              aria-label={`Move ${row.name} down`}
+              className={arrowClass}
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          </div>
+        );
+      },
+    },
     { key: 'name', header: 'Skill' },
     {
       key: 'is_active',
@@ -140,7 +204,19 @@ export default function SkillsPage() {
         className="xl:grid-cols-3"
       />
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Search skills…" className="mb-4 max-w-sm" />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search skills…" className="w-full max-w-sm" />
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-gray-500">
+            {canReorder || items.length <= 1
+              ? 'This order is used on the maid form.'
+              : 'Clear the search and filter to change the order.'}
+          </p>
+          <Button variant="secondary" size="sm" onClick={() => setConfirmReset(true)} disabled={items.length <= 1}>
+            <ArrowDownAZ className="h-4 w-4" /> Reset to A–Z
+          </Button>
+        </div>
+      </div>
 
       <Table
         columns={columns}
@@ -189,6 +265,17 @@ export default function SkillsPage() {
         title="Delete skill"
         message={`Delete "${deleteTarget?.name}"? It will no longer be offered on maid forms. Maid profiles that already list it keep it.`}
         confirmLabel="Delete"
+      />
+
+      <ConfirmDialog
+        open={confirmReset}
+        onClose={() => setConfirmReset(false)}
+        onConfirm={handleResetOrder}
+        loading={resetting}
+        variant="primary"
+        title="Reset skill order"
+        message="Forget the custom order and list every skill alphabetically (A–Z)?"
+        confirmLabel="Reset to A–Z"
       />
     </div>
   );

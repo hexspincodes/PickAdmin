@@ -9,6 +9,7 @@ import {
   deleteCustomer,
 } from '../features/customers/customersSlice';
 import ConfirmDialog from '../components/common/ConfirmDialog';
+import Pagination from '../components/common/Pagination';
 import StatCards from '../components/common/StatCards';
 import { formatDateTime } from '../utils/formatDate';
 import { CUSTOMERS_PAGE_SIZE } from '../features/customers/customersAPI';
@@ -199,29 +200,13 @@ export default function CustomersPage() {
           {statusRows.length} {statusFilter} customer{statusRows.length === 1 ? '' : 's'}
         </p>
       ) : (
-        <div className="mt-3 flex items-center justify-between">
-          <p className="text-xs text-gray-400">
-            Page {page} of {totalPages} · {count} customers
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={page <= 1 || status === 'loading'}
-              onClick={() => dispatch(fetchCustomers({ page: page - 1, search }))}
-            >
-              Prev
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={page >= totalPages || status === 'loading'}
-              onClick={() => dispatch(fetchCustomers({ page: page + 1, search }))}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onChange={(p) => dispatch(fetchCustomers({ page: p, search }))}
+          disabled={status === 'loading'}
+          summary={`Page ${page.toLocaleString('en-AE')} of ${totalPages.toLocaleString('en-AE')} · ${count.toLocaleString('en-AE')} customers`}
+        />
       )}
 
       <Modal

@@ -313,6 +313,11 @@ export default function MaidFormPage() {
     update({ [list]: form[list].map((item, idx) => (idx === i ? { ...item, ...patch } : item)) });
   const removeListItem = (list, i) => update({ [list]: form[list].filter((_, idx) => idx !== i) });
 
+  const skillRank = (skill) => {
+    const i = skillOptions.indexOf(skill);
+    return i === -1 ? skillOptions.length : i;
+  };
+
   const toggleSkill = (skill) =>
     update({ skills: form.skills.includes(skill) ? form.skills.filter((s) => s !== skill) : [...form.skills, skill] });
 
@@ -381,7 +386,9 @@ export default function MaidFormPage() {
       available_from: form.available_from,
       visa_status: form.visa_status,
       visa_expire: form.visa_expire,
-      skills: form.skills,
+      // Saved in the Skills page order (not click order) so profiles list skills consistently.
+      // Skills no longer in the catalog keep their place after the listed ones.
+      skills: [...form.skills].sort((a, b) => skillRank(a) - skillRank(b)),
       option: form.option,
       language: form.languages
         .filter((l) => l.name)

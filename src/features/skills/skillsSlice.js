@@ -51,6 +51,29 @@ export const removeSkill = createAsyncThunk('skills/remove', async (id, { dispat
   }
 });
 
+// ids: every skill's _id in the new order. The list reorders immediately; a failure reloads it.
+export const reorderSkills = createAsyncThunk('skills/reorder', async (ids, { dispatch, rejectWithValue }) => {
+  try {
+    const res = await skillsAPI.reorderSkills(ids);
+    return res.data?.skills || [];
+  } catch (err) {
+    toast.error(err.message);
+    dispatch(fetchSkills());
+    return rejectWithValue(err.message);
+  }
+});
+
+export const resetSkillOrder = createAsyncThunk('skills/resetOrder', async (_, { rejectWithValue }) => {
+  try {
+    const res = await skillsAPI.resetSkillOrder();
+    toast.success(res.message || 'Skills sorted A–Z');
+    return res.data?.skills || [];
+  } catch (err) {
+    toast.error(err.message);
+    return rejectWithValue(err.message);
+  }
+});
+
 const skillsSlice = createSlice({
   name: 'skills',
   initialState: { items: [], status: 'idle', error: null },
@@ -67,6 +90,16 @@ const skillsSlice = createSlice({
       .addCase(fetchSkills.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      .addCase(reorderSkills.pending, (state, action) => {
+        const position = new Map(action.meta.arg.map((id, i) => [id, i]));
+        state.items = [...state.items].sort((a, b) => position.get(a._id) - position.get(b._id));
+      })
+      .addCase(reorderSkills.fulfilled, (state, action) => {
+        state.items = action.payload;
+      })
+      .addCase(resetSkillOrder.fulfilled, (state, action) => {
+        state.items = action.payload;
       });
   },
 });

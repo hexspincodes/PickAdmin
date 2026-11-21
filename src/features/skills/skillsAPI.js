@@ -16,3 +16,10 @@ export const updateSkill = (id, payload) => unwrap(api1.patch(`/api/v1/skills/${
 // DELETE /api/v1/skills/:id — Backend1, JWT, SA/A. Maid profiles keep the skill;
 // the response's data.maidsUsing says how many still list it.
 export const deleteSkill = (id) => unwrap(api1.delete(`/api/v1/skills/${id}`));
+
+// PUT /api/v1/skills/order — Backend1, JWT, SA/A. ids: every skill's _id in display order
+// (a partial or stale list is refused with 409). Returns { skills } in the new order.
+export const reorderSkills = (ids) => unwrap(api1.put('/api/v1/skills/order', { ids }));
+
+// Same endpoint with { reset: true }: forget the custom order, back to A–Z.
+export const resetSkillOrder = () => unwrap(api1.put('/api/v1/skills/order', { reset: true }));
